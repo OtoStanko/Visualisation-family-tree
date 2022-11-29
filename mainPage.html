@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Wikipedia thing</title>
+        <script src="d3-dag.js"></script>
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <link href="main.css" rel="stylesheet">
+    </head>
+
+<body>
+
+<h1>Wikipedia thing</h1>
+
+<!--<div id="map_div"></div>-->
+<!--<div id="text_div"></div>-->
+
+<script src="gettingWikiData.js"></script>
+<script>
+    //let shields = [], width = 600, height = 400, numPoints = 100;
+    // insert svg object to hold the family tree
+    svg = d3.select("body").append("svg")
+        .attr("width", document.body.offsetWidth)
+        .attr("height", document.documentElement.clientHeight);
+    g = svg.append("g");
+    let zoom = d3.zoom().on('zoom', event => g.attr("transform", event.transform));
+
+    function handleZoom(e) {
+        svg.attr('transform', e.transform);
+    }
+    svg.call(zoom);
+
+    //
+
+    /*function initZoom() {
+        svg.call(zoom);
+    }
+
+    function updateData() {
+        data = [];
+        for(let i=0; i<numPoints; i++) {
+            data.push({
+            id: i,
+            x: Math.random() * width,
+            y: Math.random() * height
+            });
+        }
+    }
+
+    function update() {
+        svg
+            .selectAll('path')
+            .data(shields)
+            .join('path')
+            .attr('cx', function(d) { return d.x; })
+            .attr('cy', function(d) { return d.y; })
+            .attr('r', 3);
+    }*/
+
+
+    init(svg);
+    //initZoom();
+    //updateData();
+    //update();
+
+
+    
+</script>
+
+</body>
+</html>
