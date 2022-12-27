@@ -65,16 +65,26 @@ function getImages() {
 }
 
 
-// From the content of the page extracts names of mother father
+const getBio = (string) => {
+    const regex = / \(.*[0-9]*.* – .*\) /g;
+    var bioText = string.match(regex);
+    if (bioText != null) {
+        return bioText[0].substring(2, bioText[0].length-2);
+    }
+    return "";
+}
+
+
+// From the content of the page extracts names of mother and father
 const parseData = (string) => {
     //console.log(string);
     const regex = /father \s*= \[\[.*\]\]/g;
-    var father = string.match(regex)
+    var father = string.match(regex);
     if(father != null) {
         father = father[0].substring(father[0].indexOf("[") + 2, father[0].indexOf("]"))
         console.log(father)
     }
-    var mother = string.match(/mother \s*= \[\[.*\]\]/g)
+    var mother = string.match(/mother \s*= \[\[.*\]\]/g);
     if(mother != null) {
         mother = mother[0].substring(mother[0].indexOf("[") + 2, mother[0].indexOf("]"))
         console.log(mother)
@@ -91,10 +101,16 @@ async function getJsonResponse(url, depth=2, predecessor_lvl=0, predecessor_in_l
     if (depth <= 0) return;
     const res = await fetch(url).then((res) => res.json())
     if (res["query"]["pages"][0]["missing"]) return;
+
     var text = res["query"]["pages"][0]["revisions"][0]["content"]
-    //console.log(text);
-    const [mother, father] = parseData(text)
-    console.log(mother, father)
+    console.log(text);
+    const [mother, father] = parseData(text);
+    console.log(mother, father);
+    var bio = getBio(text);
+    console.log("Bio should be next:")
+    console.log(bio);
+    predecessor.bio = bio;
+
     var m_lvl = predecessor_lvl + 1;
     var m_in_lvl = predecessor_in_lvl * 2;
     people.push({
@@ -105,6 +121,8 @@ async function getJsonResponse(url, depth=2, predecessor_lvl=0, predecessor_in_l
         mother: {},
         lvl: m_lvl,
         in_lvl: m_in_lvl,
+        male: false,
+        bio: "",
     })
     var f_lvl = predecessor_lvl + 1;
     var f_in_lvl = predecessor_in_lvl * 2 + 1;
@@ -116,6 +134,8 @@ async function getJsonResponse(url, depth=2, predecessor_lvl=0, predecessor_in_l
         mother: {},
         lvl: f_lvl,
         in_lvl: f_in_lvl,
+        male: true,
+        bio: "",
     })
     predecessor.mother = people[people.length - 2];
     predecessor.father = people[people.length - 1];
@@ -141,6 +161,8 @@ async function foo(depth=2) {
         mother: {},
         lvl: 0,
         in_lvl: 0,
+        male: false,
+        bio: "",
     })
     //console.log(wikiLink)
     await getJsonResponse(wikiLink, depth, 0, 0, people[0])
@@ -160,7 +182,7 @@ async function foo(depth=2) {
             if(people[i].mother.name != null && people[i].father.name != null) {
                 createLines(g, people[i], people[i].mother, people[i].father);
             }
-            createShield(g, x_pos, 150 * (num_lvls - people[i].lvl));
+            createShield(g, x_pos, 150 * (num_lvls - people[i].lvl), people[i]);
             createName(g, x_pos - xOffset, 150 * (num_lvls - people[i].lvl) - 5, people[i].name)
         }
     }
@@ -175,10 +197,12 @@ var person = {
     mother: {},
     lvl: 0,
     in_lvl: 0,
+    male: false,
 }
 var people = []
 var visited = []
 //people.push({})
+
 
 function createLines(g, child, mother, father) {
     let x1 = (mother.in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, mother.lvl)) );
@@ -218,10 +242,15 @@ function createName(svg, x=0, y=0, name) {
 }
 
 
+function printOnMouseover(text) {
+    console.log(text);
+}
+
+
 // Creates a shiled in the given svg
 // y - coord of upper bound of the shield
 // x - coord of the center of the shield
-function createShield(svg, x=0, y=0) {
+function createShield(svg, x=0, y=0, person) {
     var areaGenerator = d3.area();
     areaGenerator.y0(y-50);
     
@@ -235,8 +264,16 @@ function createShield(svg, x=0, y=0) {
     [x + xOffset, y + yOffset],
     [x + xOffset, y],
     ];
+    var stroke_colour = person.male ? "blue" : "red";
 
-    svg.append('path').attr('d', areaGenerator(points)).attr('fill', 'white').attr('stroke', 'red').attr('stroke-width', 5);
+    svg.append('path')
+    .attr('d', areaGenerator(points))
+    .attr('fill', 'white')
+    .attr('stroke', stroke_colour)
+    .attr('stroke-width', 5)
+    .on('click', function () {
+        console.log(person.bio);
+      } );
 }
 
 
@@ -245,5 +282,5 @@ function init(svgg) {
     // create svg element:
     svg = svgg;
 
-    foo(5);
+    foo();
 }
