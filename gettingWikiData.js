@@ -19,7 +19,7 @@ var num_lvls;
 // From the name of the person creates url for fetching the data from english wiki
 const urlBuilder = (name) => {
     const fixedName = name.replaceAll(" ", "_")
-    console.log(fixedName)
+    //console.log(fixedName)
     const endPoint = "https://en.wikipedia.org/w/api.php";
     const wikiParams = [
         '?action=query',
@@ -99,12 +99,12 @@ const parseData = (string) => {
     var father = string.match(regex);
     if(father != null) {
         father = father[0].substring(father[0].indexOf("[") + 2, father[0].indexOf("]"))
-        console.log(father)
+        //console.log(father)
     }
     var mother = string.match(/mother \s*= \[\[.*\]\]/g);
     if(mother != null) {
         mother = mother[0].substring(mother[0].indexOf("[") + 2, mother[0].indexOf("]"))
-        console.log(mother)
+        //console.log(mother)
     }
     //console.log(father, mother)
     return [mother, father]
@@ -130,7 +130,7 @@ async function setInfo(human) {
 
     var text = res["query"]["pages"][0]["revisions"][0]["content"]
 
-    console.log(text);
+    //console.log(text);
     var bio = getBio(text);
     human.bio = bio;
 
@@ -179,18 +179,86 @@ function getBaseLog(x, y) {
     return Math.log(y) / Math.log(x);
 }
 
+function countVisible(people) {
+    let visibleCount = 0;
+    for (i = 0; i < people.length; i++) {
+        if (people[i].visible) {
+            visibleCount++;
+        }
+    }
+    return visibleCount;
+}
+
+
+function isTop(people, numlvl) {
+    var array = [];
+    for (i = 0; i < people.length; i++) {
+        if (people[i].lvl == numlvl && people[i].visible) {
+            array.push(people[i].in_lvl)
+        }
+    }
+    if (array.length <= 2) {
+        return false;
+    }
+    array.sort();
+    var cons = 1;
+    for (i = 0; i < array.length - 1; i++) {
+        if (array[i] + 1 == array[i+1]) {
+            cons += 1;
+        }
+        if (cons >= 3) {
+            return true;
+        }
+    }
+    return false;
+}
+
 
 function createGraph(people) {
     num_people = people.length;
     //var num_in_top_lvl = (num_people + 1) / 2;
-    num_in_top_lvl = Math.pow(2, people[people.length - 1].lvl);
-    num_lvls = getBaseLog(2, num_people + 1);
+    var maxPeopleLvl = 0;
+    for (i =0; i < num_people; i++) {
+        if (people[i].lvl > maxPeopleLvl && people[i].visible) {
+            maxPeopleLvl = people[i].lvl;
+        }
+    }
+    console.log("max level in the tree: " + maxPeopleLvl);
+
+    num_in_top_lvl = 2;
+    num_lvls = 1;//getBaseLog(2, countVisible(people) + 1); // imaginary top level
+    for (level = maxPeopleLvl; level >= 1; level--) {
+        if (isTop(people, level)) {
+            console.log("Top level:" + level);
+            num_in_top_lvl = Math.pow(2, level);
+            num_lvls = level;
+            break;
+        }
+    }
+    console.log(num_in_top_lvl, num_lvls);
+    //num_in_top_lvl = Math.pow(2, maxPeopleLvl);
+    //num_lvls = getBaseLog(2, num_people + 1);
 
     for (i = 0; i < num_people; i++) {
         if (people[i].name != null && people[i].visible) {
-            console.log("name: " + people[i].name);
+            //console.log("name: " + people[i].name);
             var xNameOffset = people[i].name.length * 3;
-            let x_pos = (people[i].in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, people[i].lvl)) );
+            var x_pos = 0;
+            if (people[i].lvl <= num_lvls) {
+                x_pos = (people[i].in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, people[i].lvl)));
+            } else {
+                var currlvl = people[i].lvl;
+                let genderOffset = (people[i].in_lvl % 2 == 0) ? -0.5 : 0.5;
+                var inlvl = people[i].in_lvl;
+                while (currlvl != num_lvls) {
+                    console.log("beeep");
+                    inlvl = Math.floor(inlvl / 2);
+                    genderOffset += ((inlvl % 2 == 0) ? -0.5 : 0.5);
+                    currlvl--;
+                }
+                x_pos = (inlvl + genderOffset) * ((120 * num_in_top_lvl) / (Math.pow(2, num_lvls)));
+            }
+            
             if(people[i].mother.name != null && people[i].father.name != null &&
                 people[i].mother.visible && people[i].father.visible) {
                 createLines(g, people[i], people[i].mother, people[i].father);
@@ -219,13 +287,7 @@ async function foo(depth=2) {
         expanded: false,
     })
     setInfo(people[0]);
-    //console.log(wikiLink)
-    //await getJsonResponse(wikiLink, depth, 0, 0, people[0])
-
-    //console.log("RESULT:")
     console.log(people)
-
-    //createGraph(people)
 }
 
 
