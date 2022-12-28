@@ -8,6 +8,8 @@ var mapAreaWidth = 1520;//d3.select("#map_div").node().clientWidth
 var svg;
 var g;
 
+var textSvg;
+
 
 var num_people;
 var num_in_top_lvl;
@@ -65,13 +67,28 @@ function getImages() {
 }
 
 
+// returns string with some basic info about the person
 const getBio = (string) => {
-    const regex = / \(.*[0-9]*.* – .*\) /g;
-    var bioText = string.match(regex);
-    if (bioText != null) {
-        return bioText[0].substring(2, bioText[0].length-2);
+    var regex = / \(.*[0-9]*.* – .*\) /g;
+    var bioText = ""
+    result = string.match(regex);
+    if (result != null) {
+        var rawResult = result[0].substring(2, result[0].length-2);
+        if (rawResult.includes(";")) {
+            rawResult = rawResult.substring(rawResult.indexOf(";") + 1);
+        }
+        bioText += rawResult;
     }
-    return "";
+
+    // get full name
+    regex = /birth_name\s*= .*\n/g;
+    result = string.match(regex);
+    if (result != null) {
+        var rawResult = "\n" + result[0].substring(result[0].indexOf("=") + 2, result[0].length);
+        bioText += rawResult;
+    }
+    console.log("bio: " + bioText);
+    return bioText;
 }
 
 
@@ -94,25 +111,32 @@ const parseData = (string) => {
 }
 
 
-// For a given url to the person's wiki recursively gets the predecessors
-// How many predecessors may be limited by depth arg
-// Each person is pushed to the "people" array
-async function getJsonResponse(url, depth=2, predecessor_lvl=0, predecessor_in_lvl=0, predecessor) {
-    if (depth <= 0) return;
+async function expand(human) {
+    human.expanded = true;
+    if(human.mother.name != null) {
+        human.mother.visible = true;
+        await setInfo(human.mother)
+    }
+    if(human.father.name != null) {
+        human.father.visible = true;
+        await setInfo(human.father)
+    }
+}
+
+async function setInfo(human) {
+    const url = urlBuilder(human.name);
     const res = await fetch(url).then((res) => res.json())
     if (res["query"]["pages"][0]["missing"]) return;
 
     var text = res["query"]["pages"][0]["revisions"][0]["content"]
-    console.log(text);
-    const [mother, father] = parseData(text);
-    console.log(mother, father);
-    var bio = getBio(text);
-    console.log("Bio should be next:")
-    console.log(bio);
-    predecessor.bio = bio;
 
-    var m_lvl = predecessor_lvl + 1;
-    var m_in_lvl = predecessor_in_lvl * 2;
+    console.log(text);
+    var bio = getBio(text);
+    human.bio = bio;
+
+    const [mother, father] = parseData(text);
+    var m_lvl = human.lvl + 1;
+    var m_in_lvl = human.in_lvl * 2;
     people.push({
         name: mother,
         url: "",
@@ -123,9 +147,11 @@ async function getJsonResponse(url, depth=2, predecessor_lvl=0, predecessor_in_l
         in_lvl: m_in_lvl,
         male: false,
         bio: "",
+        visible: false,
+        expanded: false,
     })
-    var f_lvl = predecessor_lvl + 1;
-    var f_in_lvl = predecessor_in_lvl * 2 + 1;
+    var f_lvl = human.lvl + 1;
+    var f_in_lvl = human.in_lvl * 2 + 1;
     people.push({
         name: father,
         url: "",
@@ -136,23 +162,49 @@ async function getJsonResponse(url, depth=2, predecessor_lvl=0, predecessor_in_l
         in_lvl: f_in_lvl,
         male: true,
         bio: "",
+        visible: false,
+        expanded: false,
     })
-    predecessor.mother = people[people.length - 2];
-    predecessor.father = people[people.length - 1];
-    //console.log(people)
-    if(mother != null) {await getJsonResponse(urlBuilder(mother), depth-1, m_lvl, m_in_lvl, predecessor.mother)}
-    if(father != null) {await getJsonResponse(urlBuilder(father), depth-1, f_lvl, f_in_lvl, predecessor.father)}
+    human.mother = people[people.length - 2];
+    human.father = people[people.length - 1];
+    svg.selectAll("path"). remove();
+    svg.selectAll("line"). remove();
+    svg.selectAll("text"). remove();
+    createGraph(people);
+    console.log(people);
 }
 
 
 function getBaseLog(x, y) {
     return Math.log(y) / Math.log(x);
-  }
+}
+
+
+function createGraph(people) {
+    num_people = people.length;
+    //var num_in_top_lvl = (num_people + 1) / 2;
+    num_in_top_lvl = Math.pow(2, people[people.length - 1].lvl);
+    num_lvls = getBaseLog(2, num_people + 1);
+
+    for (i = 0; i < num_people; i++) {
+        if (people[i].name != null && people[i].visible) {
+            console.log("name: " + people[i].name);
+            var xNameOffset = people[i].name.length * 3;
+            let x_pos = (people[i].in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, people[i].lvl)) );
+            if(people[i].mother.name != null && people[i].father.name != null &&
+                people[i].mother.visible && people[i].father.visible) {
+                createLines(g, people[i], people[i].mother, people[i].father);
+            }
+            createShield(g, x_pos, 150 * (num_lvls - people[i].lvl), people[i]);
+            createName(g, x_pos - xNameOffset, 150 * (num_lvls - people[i].lvl) - 5, people[i].name)
+        }
+    }
+}
+
 
 // Main function for getting the data about the housetree
 // Starts with Her Majesty Qeeen Elizabeth II
 async function foo(depth=2) {
-    const wikiLink = urlBuilder("Elizabeth II");
     people.push({
         name: "Elizabeth II",
         url: "",
@@ -163,29 +215,17 @@ async function foo(depth=2) {
         in_lvl: 0,
         male: false,
         bio: "",
+        visible: true,
+        expanded: false,
     })
+    setInfo(people[0]);
     //console.log(wikiLink)
-    await getJsonResponse(wikiLink, depth, 0, 0, people[0])
+    //await getJsonResponse(wikiLink, depth, 0, 0, people[0])
 
     //console.log("RESULT:")
     console.log(people)
 
-    num_people = people.length;
-    //var num_in_top_lvl = (num_people + 1) / 2;
-    num_in_top_lvl = Math.pow(2, people[people.length - 1].lvl);
-    num_lvls = getBaseLog(2, num_people + 1);
-
-    for (i = 0; i < num_people; i++) {
-        if (people[i].name != null) {
-            var xOffset = people[i].name.length * 3;
-            let x_pos = (people[i].in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, people[i].lvl)) );
-            if(people[i].mother.name != null && people[i].father.name != null) {
-                createLines(g, people[i], people[i].mother, people[i].father);
-            }
-            createShield(g, x_pos, 150 * (num_lvls - people[i].lvl), people[i]);
-            createName(g, x_pos - xOffset, 150 * (num_lvls - people[i].lvl) - 5, people[i].name)
-        }
-    }
+    //createGraph(people)
 }
 
 
@@ -198,6 +238,7 @@ var person = {
     lvl: 0,
     in_lvl: 0,
     male: false,
+    expanded: false,
 }
 var people = []
 var visited = []
@@ -272,15 +313,31 @@ function createShield(svg, x=0, y=0, person) {
     .attr('stroke', stroke_colour)
     .attr('stroke-width', 5)
     .on('click', function () {
-        console.log(person.bio);
-      } );
+        if(!person.expanded) {
+            expand(person);
+        }
+        textSvg.selectAll("text").remove();
+        textSvg.append("text")
+        .attr("x", 10)
+        .attr("y", 10)
+        .attr("dy", ".2em")
+        .text(person.name);
+        if (person.bio != "") {
+            textSvg.append("text")
+            .attr("x", 10)
+            .attr("y", 30)
+            .attr("dy", ".2em")
+            .text(person.bio);
+        }
+      });
 }
 
 
-function init(svgg) {
+function init(svg_fromHTML, text_svg) {
     console.log("Init run")
     // create svg element:
-    svg = svgg;
+    svg = svg_fromHTML;
+    textSvg = text_svg;
 
     foo();
 }
