@@ -215,16 +215,16 @@ function isTop(people, numlvl) {
 
 
 
-function getXPos(people, i, num_lvls, num_in_top_lvl) {
+function getXPos(person, num_lvls, num_in_top_lvl) {
     var x_pos = 0;
-    if (people[i].lvl <= num_lvls) {
-        console.log(people[i].name + " is ok. In lvl:  " + people[i].lvl + " " + people[i].in_lvl);
-        x_pos = (people[i].in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, people[i].lvl)));
+    if (person.lvl <= num_lvls) {
+        console.log(person.name + " is ok. In lvl:  " + person.lvl + " " + person.in_lvl);
+        x_pos = (person.in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, person.lvl)));
     } else {
-        console.log(people[i].name + " is nok. In lvl:  " + people[i].lvl + " " + people[i].in_lvl);
-        var currlvl = people[i].lvl;
-        var inlvl = people[i].in_lvl;
-        let genderOffset = 0;//(people[i].in_lvl % 2 == 0) ? -0.5 : 0.5;
+        console.log(person.name + " is nok. In lvl:  " + person.lvl + " " + person.in_lvl);
+        var currlvl = person.lvl;
+        var inlvl = person.in_lvl;
+        let genderOffset = 0;
         while (currlvl != num_lvls) {
             console.log(genderOffset);
             genderOffset += ((inlvl % 2 == 0) ? -0.5 : 0.5);
@@ -240,7 +240,6 @@ function getXPos(people, i, num_lvls, num_in_top_lvl) {
 
 function createGraph(people) {
     num_people = people.length;
-    //var num_in_top_lvl = (num_people + 1) / 2;
     var maxPeopleLvl = 0;
     for (i =0; i < num_people; i++) {
         if (people[i].lvl > maxPeopleLvl && people[i].visible) {
@@ -250,7 +249,7 @@ function createGraph(people) {
     console.log("max level in the tree: " + maxPeopleLvl);
 
     num_in_top_lvl = 2;
-    num_lvls = 1;//getBaseLog(2, countVisible(people) + 1); // imaginary top level
+    num_lvls = 1;
     for (level = maxPeopleLvl; level >= 1; level--) {
         if (isTop(people, level)) {
             console.log("Top level:" + level);
@@ -260,18 +259,14 @@ function createGraph(people) {
         }
     }
     console.log(num_in_top_lvl, num_lvls);
-    //num_in_top_lvl = Math.pow(2, maxPeopleLvl);
-    //num_lvls = getBaseLog(2, num_people + 1);
 
     for (i = 0; i < num_people; i++) {
         if (people[i].name != null && people[i].visible) {
             //console.log("name: " + people[i].name);
             var xNameOffset = people[i].name.length * 3;
-            var x_pos = getXPos(people, i, num_lvls, num_in_top_lvl);
-            if(people[i].mother.name != null && people[i].father.name != null &&
-                people[i].mother.visible && people[i].father.visible) {
-                createLines(g, people[i], people[i].mother, people[i].father, x_pos);
-            }
+            var x_pos = getXPos(people[i], num_lvls, num_in_top_lvl);
+            
+            createLines(g, people[i], people[i].mother, people[i].father, x_pos);
             createShield(g, x_pos, 150 * (num_lvls - people[i].lvl), people[i]);
             createName(g, x_pos - xNameOffset, 150 * (num_lvls - people[i].lvl) - 5, people[i].name)
         }
@@ -313,38 +308,37 @@ var person = {
 }
 var people = []
 var visited = []
-//people.push({})
 
+
+function createPartialLines(g, person, predecessor, x_pos) {
+    if(predecessor.name != null && predecessor.visible) {
+        let x1 = getXPos(predecessor, num_lvls, num_in_top_lvl);
+        let y1 = 150 * (num_lvls - predecessor.lvl) + 5;
+        let x2 = x_pos;
+        let y2 = y1;
+        g.append("line")
+        .attr("x1", x1)
+        .attr("y1", y1)
+        .attr("x2", x2)
+        .attr("y2", y2)
+        .attr("stroke", "black")
+
+        let x3 = x_pos;
+        let y3 = y1;
+        let x4 = x_pos;
+        let y4 = 150 * (num_lvls - person.lvl) + 5;
+        g.append("line")
+        .attr("x1", x3)
+        .attr("y1", y3)
+        .attr("x2", x4)
+        .attr("y2", y4)
+        .attr("stroke", "black")
+    }
+}
 
 function createLines(g, person, mother, father, x_pos) {
-    if (person.lvl == 0) {
-        return;
-    }
-    let x1 = (mother.in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, mother.lvl)) );
-    let y1 = 150 * (num_lvls - mother.lvl) + 5;
-
-    let x2 = (father.in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, father.lvl)) );
-    let y2 = y1;
-
-    let x3 = (x1 + x2 ) / 2;
-    let y3 = y1;
-
-    let x4 = x3;
-    let y4 = 150 * (num_lvls - person.lvl) + 5;
-
-    g.append("line")
-    .attr("x1", x1)
-    .attr("y1", y1)
-    .attr("x2", x2)
-    .attr("y2", y2)
-    .attr("stroke", "black")
-
-    g.append("line")
-    .attr("x1", x3)
-    .attr("y1", y3)
-    .attr("x2", x4)
-    .attr("y2", y4)
-    .attr("stroke", "black")
+    createPartialLines(g, person, person.mother, x_pos);
+    createPartialLines(g, person, person.father, x_pos);
 }
 
 
