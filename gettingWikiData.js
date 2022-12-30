@@ -3,12 +3,13 @@
 //D3.js canvases
 var textArea;
 var mapArea;
-var mapAreaWidth = 1520;//d3.select("#map_div").node().clientWidth
+var mapAreaWidth = 1520;
 
 var svg;
 var g;
 
 var textSvg;
+var textG;
 
 
 var num_people;
@@ -80,6 +81,32 @@ const getBio = (string) => {
         bioText += rawResult;
     }
 
+    // get death date
+    // | death_date   = {{death date and age|2022|09|08|1926|04|21|df=yes}}
+    /*regex = /death_date \s*= .*}}/g;
+    result = string.match(regex);
+    if(result != null) {
+        result = result[0];
+        console.log("DEATH1: " + result);
+        result = result.substring(result.indexOf("{") + 2, result.indexOf("}"));
+        result = result.split("|");
+        let dates = [];
+        for (i = 0; i < result.length; i++) {
+            if (isNaN(result[i])) {
+                continue;
+            }
+            dates.push(result[i]);
+        }
+        console.log("DEATH2: " + dates);
+        if (dates.length != 6) {
+            return;
+        }
+        var months = [ "January", "February", "March", "April", "May", "June", 
+           "July", "August", "September", "October", "November", "December" ];
+        bioText += "\n" + Number(dates[5]) + " " + months[Number(dates[4]) - 1] + " " + dates[3];
+        bioText += " - " + Number(dates[2]) + " " + months[Number(dates[1]) - 1] + " " + dates[0];
+    }*/
+
     // get full name
     regex = /birth_name\s*= .*\n/g;
     result = string.match(regex);
@@ -130,7 +157,7 @@ async function setInfo(human) {
 
     var text = res["query"]["pages"][0]["revisions"][0]["content"]
 
-    //console.log(text);
+    console.log(text);
     var bio = getBio(text);
     human.bio = bio;
 
@@ -214,19 +241,42 @@ function isTop(people, numlvl) {
 }
 
 
+
+function getXPos(person, num_lvls, num_in_top_lvl) {
+    var x_pos = 0;
+    if (person.lvl <= num_lvls) {
+        //console.log(person.name + " is ok. In lvl:  " + person.lvl + " " + person.in_lvl);
+        x_pos = (person.in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, person.lvl)));
+    } else {
+        //console.log(person.name + " is nok. In lvl:  " + person.lvl + " " + person.in_lvl);
+        var currlvl = person.lvl;
+        var inlvl = person.in_lvl;
+        let genderOffset = 0;
+        while (currlvl != num_lvls) {
+            //console.log(genderOffset);
+            genderOffset += ((inlvl % 2 == 0) ? -0.5 : 0.5);
+            inlvl = Math.floor(inlvl / 2);
+            currlvl--;
+        }
+        //console.log(num_lvls + " " + inlvl + " " + genderOffset);
+        x_pos = (inlvl + 0.5 + genderOffset) * ((120 * num_in_top_lvl) / (Math.pow(2, num_lvls)));
+    }
+    return x_pos;
+}
+
+
 function createGraph(people) {
     num_people = people.length;
-    //var num_in_top_lvl = (num_people + 1) / 2;
     var maxPeopleLvl = 0;
     for (i =0; i < num_people; i++) {
         if (people[i].lvl > maxPeopleLvl && people[i].visible) {
             maxPeopleLvl = people[i].lvl;
         }
     }
-    console.log("max level in the tree: " + maxPeopleLvl);
+    //console.log("max level in the tree: " + maxPeopleLvl);
 
     num_in_top_lvl = 2;
-    num_lvls = 1;//getBaseLog(2, countVisible(people) + 1); // imaginary top level
+    num_lvls = 1;
     for (level = maxPeopleLvl; level >= 1; level--) {
         if (isTop(people, level)) {
             console.log("Top level:" + level);
@@ -235,34 +285,15 @@ function createGraph(people) {
             break;
         }
     }
-    console.log(num_in_top_lvl, num_lvls);
-    //num_in_top_lvl = Math.pow(2, maxPeopleLvl);
-    //num_lvls = getBaseLog(2, num_people + 1);
+    //console.log(num_in_top_lvl, num_lvls);
 
     for (i = 0; i < num_people; i++) {
         if (people[i].name != null && people[i].visible) {
             //console.log("name: " + people[i].name);
             var xNameOffset = people[i].name.length * 3;
-            var x_pos = 0;
-            if (people[i].lvl <= num_lvls) {
-                x_pos = (people[i].in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, people[i].lvl)));
-            } else {
-                var currlvl = people[i].lvl;
-                let genderOffset = (people[i].in_lvl % 2 == 0) ? -0.5 : 0.5;
-                var inlvl = people[i].in_lvl;
-                while (currlvl != num_lvls) {
-                    console.log("beeep");
-                    inlvl = Math.floor(inlvl / 2);
-                    genderOffset += ((inlvl % 2 == 0) ? -0.5 : 0.5);
-                    currlvl--;
-                }
-                x_pos = (inlvl + genderOffset) * ((120 * num_in_top_lvl) / (Math.pow(2, num_lvls)));
-            }
+            var x_pos = getXPos(people[i], num_lvls, num_in_top_lvl);
             
-            if(people[i].mother.name != null && people[i].father.name != null &&
-                people[i].mother.visible && people[i].father.visible) {
-                createLines(g, people[i], people[i].mother, people[i].father);
-            }
+            createLines(g, people[i], people[i].mother, people[i].father, x_pos);
             createShield(g, x_pos, 150 * (num_lvls - people[i].lvl), people[i]);
             createName(g, x_pos - xNameOffset, 150 * (num_lvls - people[i].lvl) - 5, people[i].name)
         }
@@ -304,35 +335,37 @@ var person = {
 }
 var people = []
 var visited = []
-//people.push({})
 
 
-function createLines(g, child, mother, father) {
-    let x1 = (mother.in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, mother.lvl)) );
-    let y1 = 150 * (num_lvls - mother.lvl) + 5;
+function createPartialLines(g, person, predecessor, x_pos) {
+    if(predecessor.name != null && predecessor.visible) {
+        let x1 = getXPos(predecessor, num_lvls, num_in_top_lvl);
+        let y1 = 150 * (num_lvls - predecessor.lvl) + 5;
+        let x2 = x_pos;
+        let y2 = y1;
+        g.append("line")
+        .attr("x1", x1)
+        .attr("y1", y1)
+        .attr("x2", x2)
+        .attr("y2", y2)
+        .attr("stroke", "black")
 
-    let x2 = (father.in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, father.lvl)) );
-    let y2 = y1;
+        let x3 = x_pos;
+        let y3 = y1;
+        let x4 = x_pos;
+        let y4 = 150 * (num_lvls - person.lvl) + 5;
+        g.append("line")
+        .attr("x1", x3)
+        .attr("y1", y3)
+        .attr("x2", x4)
+        .attr("y2", y4)
+        .attr("stroke", "black")
+    }
+}
 
-    let x3 = (x1 + x2 ) / 2;
-    let y3 = y1;
-
-    let x4 = x3;
-    let y4 = 150 * (num_lvls - child.lvl) + 5;
-
-    g.append("line")
-    .attr("x1", x1)
-    .attr("y1", y1)
-    .attr("x2", x2)
-    .attr("y2", y2)
-    .attr("stroke", "black")
-
-    g.append("line")
-    .attr("x1", x3)
-    .attr("y1", y3)
-    .attr("x2", x4)
-    .attr("y2", y4)
-    .attr("stroke", "black")
+function createLines(g, person, mother, father, x_pos) {
+    createPartialLines(g, person, person.mother, x_pos);
+    createPartialLines(g, person, person.father, x_pos);
 }
 
 
@@ -378,18 +411,22 @@ function createShield(svg, x=0, y=0, person) {
         if(!person.expanded) {
             expand(person);
         }
+        let xOffset = 22;
         textSvg.selectAll("text").remove();
         textSvg.append("text")
-        .attr("x", 10)
+        .attr("x", xOffset)
         .attr("y", 10)
         .attr("dy", ".2em")
         .text(person.name);
         if (person.bio != "") {
-            textSvg.append("text")
-            .attr("x", 10)
-            .attr("y", 30)
-            .attr("dy", ".2em")
-            .text(person.bio);
+            let parsedBio = person.bio.split("\n");
+            for (i = 0; i < parsedBio.length; i++) {
+                textSvg.append("text")
+                .attr("x", xOffset)
+                .attr("y", 30 + i*20)
+                .attr("dy", ".2em")
+                .text(parsedBio[i]);
+            }
         }
       });
 }
@@ -399,7 +436,22 @@ function init(svg_fromHTML, text_svg) {
     console.log("Init run")
     // create svg element:
     svg = svg_fromHTML;
+
     textSvg = text_svg;
+    var areaGenerator = d3.area();
+    console.log(document.body.offsetWidth, document.documentElement.clientHeight);
+    var points = [
+        [1, 0],
+        [1, document.documentElement.clientHeight],
+        [15, document.documentElement.clientHeight],
+        [15, 0],
+        ];
+    let stroke_colour = "yellow";
+    textSvg.append('path')
+    .attr('d', areaGenerator(points))
+    .attr('fill', 'red')
+    .attr('stroke', stroke_colour)
+    .attr('stroke-width', 3)
 
     foo();
 }

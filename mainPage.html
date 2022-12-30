@@ -28,7 +28,7 @@
         .attr("width", document.body.offsetWidth * 0.25)
         .attr("dx", document.body.offsetWidth * 0.75)
         .attr("height", document.documentElement.clientHeight);
-    textSvg.append("g");
+    textG = textSvg.append("g");
 
 
     function handleZoom(e) {
