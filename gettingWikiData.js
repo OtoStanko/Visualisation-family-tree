@@ -3,12 +3,13 @@
 //D3.js canvases
 var textArea;
 var mapArea;
-var mapAreaWidth = 1520;//d3.select("#map_div").node().clientWidth
+var mapAreaWidth = 1520;
 
 var svg;
 var g;
 
 var textSvg;
+var textG;
 
 
 var num_people;
@@ -80,6 +81,32 @@ const getBio = (string) => {
         bioText += rawResult;
     }
 
+    // get death date
+    // | death_date   = {{death date and age|2022|09|08|1926|04|21|df=yes}}
+    /*regex = /death_date \s*= .*}}/g;
+    result = string.match(regex);
+    if(result != null) {
+        result = result[0];
+        console.log("DEATH1: " + result);
+        result = result.substring(result.indexOf("{") + 2, result.indexOf("}"));
+        result = result.split("|");
+        let dates = [];
+        for (i = 0; i < result.length; i++) {
+            if (isNaN(result[i])) {
+                continue;
+            }
+            dates.push(result[i]);
+        }
+        console.log("DEATH2: " + dates);
+        if (dates.length != 6) {
+            return;
+        }
+        var months = [ "January", "February", "March", "April", "May", "June", 
+           "July", "August", "September", "October", "November", "December" ];
+        bioText += "\n" + Number(dates[5]) + " " + months[Number(dates[4]) - 1] + " " + dates[3];
+        bioText += " - " + Number(dates[2]) + " " + months[Number(dates[1]) - 1] + " " + dates[0];
+    }*/
+
     // get full name
     regex = /birth_name\s*= .*\n/g;
     result = string.match(regex);
@@ -130,7 +157,7 @@ async function setInfo(human) {
 
     var text = res["query"]["pages"][0]["revisions"][0]["content"]
 
-    //console.log(text);
+    console.log(text);
     var bio = getBio(text);
     human.bio = bio;
 
@@ -218,20 +245,20 @@ function isTop(people, numlvl) {
 function getXPos(person, num_lvls, num_in_top_lvl) {
     var x_pos = 0;
     if (person.lvl <= num_lvls) {
-        console.log(person.name + " is ok. In lvl:  " + person.lvl + " " + person.in_lvl);
+        //console.log(person.name + " is ok. In lvl:  " + person.lvl + " " + person.in_lvl);
         x_pos = (person.in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, person.lvl)));
     } else {
-        console.log(person.name + " is nok. In lvl:  " + person.lvl + " " + person.in_lvl);
+        //console.log(person.name + " is nok. In lvl:  " + person.lvl + " " + person.in_lvl);
         var currlvl = person.lvl;
         var inlvl = person.in_lvl;
         let genderOffset = 0;
         while (currlvl != num_lvls) {
-            console.log(genderOffset);
+            //console.log(genderOffset);
             genderOffset += ((inlvl % 2 == 0) ? -0.5 : 0.5);
             inlvl = Math.floor(inlvl / 2);
             currlvl--;
         }
-        console.log(num_lvls + " " + inlvl + " " + genderOffset);
+        //console.log(num_lvls + " " + inlvl + " " + genderOffset);
         x_pos = (inlvl + 0.5 + genderOffset) * ((120 * num_in_top_lvl) / (Math.pow(2, num_lvls)));
     }
     return x_pos;
@@ -246,7 +273,7 @@ function createGraph(people) {
             maxPeopleLvl = people[i].lvl;
         }
     }
-    console.log("max level in the tree: " + maxPeopleLvl);
+    //console.log("max level in the tree: " + maxPeopleLvl);
 
     num_in_top_lvl = 2;
     num_lvls = 1;
@@ -258,7 +285,7 @@ function createGraph(people) {
             break;
         }
     }
-    console.log(num_in_top_lvl, num_lvls);
+    //console.log(num_in_top_lvl, num_lvls);
 
     for (i = 0; i < num_people; i++) {
         if (people[i].name != null && people[i].visible) {
@@ -384,18 +411,22 @@ function createShield(svg, x=0, y=0, person) {
         if(!person.expanded) {
             expand(person);
         }
+        let xOffset = 22;
         textSvg.selectAll("text").remove();
         textSvg.append("text")
-        .attr("x", 10)
+        .attr("x", xOffset)
         .attr("y", 10)
         .attr("dy", ".2em")
         .text(person.name);
         if (person.bio != "") {
-            textSvg.append("text")
-            .attr("x", 10)
-            .attr("y", 30)
-            .attr("dy", ".2em")
-            .text(person.bio);
+            let parsedBio = person.bio.split("\n");
+            for (i = 0; i < parsedBio.length; i++) {
+                textSvg.append("text")
+                .attr("x", xOffset)
+                .attr("y", 30 + i*20)
+                .attr("dy", ".2em")
+                .text(parsedBio[i]);
+            }
         }
       });
 }
@@ -405,7 +436,22 @@ function init(svg_fromHTML, text_svg) {
     console.log("Init run")
     // create svg element:
     svg = svg_fromHTML;
+
     textSvg = text_svg;
+    var areaGenerator = d3.area();
+    console.log(document.body.offsetWidth, document.documentElement.clientHeight);
+    var points = [
+        [1, 0],
+        [1, document.documentElement.clientHeight],
+        [15, document.documentElement.clientHeight],
+        [15, 0],
+        ];
+    let stroke_colour = "yellow";
+    textSvg.append('path')
+    .attr('d', areaGenerator(points))
+    .attr('fill', 'red')
+    .attr('stroke', stroke_colour)
+    .attr('stroke-width', 3)
 
     foo();
 }
