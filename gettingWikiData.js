@@ -214,6 +214,30 @@ function isTop(people, numlvl) {
 }
 
 
+
+function getXPos(people, i, num_lvls, num_in_top_lvl) {
+    var x_pos = 0;
+    if (people[i].lvl <= num_lvls) {
+        console.log(people[i].name + " is ok. In lvl:  " + people[i].lvl + " " + people[i].in_lvl);
+        x_pos = (people[i].in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, people[i].lvl)));
+    } else {
+        console.log(people[i].name + " is nok. In lvl:  " + people[i].lvl + " " + people[i].in_lvl);
+        var currlvl = people[i].lvl;
+        var inlvl = people[i].in_lvl;
+        let genderOffset = 0;//(people[i].in_lvl % 2 == 0) ? -0.5 : 0.5;
+        while (currlvl != num_lvls) {
+            console.log(genderOffset);
+            genderOffset += ((inlvl % 2 == 0) ? -0.5 : 0.5);
+            inlvl = Math.floor(inlvl / 2);
+            currlvl--;
+        }
+        console.log(num_lvls + " " + inlvl + " " + genderOffset);
+        x_pos = (inlvl + 0.5 + genderOffset) * ((120 * num_in_top_lvl) / (Math.pow(2, num_lvls)));
+    }
+    return x_pos;
+}
+
+
 function createGraph(people) {
     num_people = people.length;
     //var num_in_top_lvl = (num_people + 1) / 2;
@@ -243,25 +267,10 @@ function createGraph(people) {
         if (people[i].name != null && people[i].visible) {
             //console.log("name: " + people[i].name);
             var xNameOffset = people[i].name.length * 3;
-            var x_pos = 0;
-            if (people[i].lvl <= num_lvls) {
-                x_pos = (people[i].in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, people[i].lvl)));
-            } else {
-                var currlvl = people[i].lvl;
-                let genderOffset = (people[i].in_lvl % 2 == 0) ? -0.5 : 0.5;
-                var inlvl = people[i].in_lvl;
-                while (currlvl != num_lvls) {
-                    console.log("beeep");
-                    inlvl = Math.floor(inlvl / 2);
-                    genderOffset += ((inlvl % 2 == 0) ? -0.5 : 0.5);
-                    currlvl--;
-                }
-                x_pos = (inlvl + genderOffset) * ((120 * num_in_top_lvl) / (Math.pow(2, num_lvls)));
-            }
-            
+            var x_pos = getXPos(people, i, num_lvls, num_in_top_lvl);
             if(people[i].mother.name != null && people[i].father.name != null &&
                 people[i].mother.visible && people[i].father.visible) {
-                createLines(g, people[i], people[i].mother, people[i].father);
+                createLines(g, people[i], people[i].mother, people[i].father, x_pos);
             }
             createShield(g, x_pos, 150 * (num_lvls - people[i].lvl), people[i]);
             createName(g, x_pos - xNameOffset, 150 * (num_lvls - people[i].lvl) - 5, people[i].name)
@@ -307,7 +316,10 @@ var visited = []
 //people.push({})
 
 
-function createLines(g, child, mother, father) {
+function createLines(g, person, mother, father, x_pos) {
+    if (person.lvl == 0) {
+        return;
+    }
     let x1 = (mother.in_lvl + 0.5) * ((120 * num_in_top_lvl) / (Math.pow(2, mother.lvl)) );
     let y1 = 150 * (num_lvls - mother.lvl) + 5;
 
@@ -318,7 +330,7 @@ function createLines(g, child, mother, father) {
     let y3 = y1;
 
     let x4 = x3;
-    let y4 = 150 * (num_lvls - child.lvl) + 5;
+    let y4 = 150 * (num_lvls - person.lvl) + 5;
 
     g.append("line")
     .attr("x1", x1)
