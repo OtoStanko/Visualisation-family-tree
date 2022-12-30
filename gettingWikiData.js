@@ -40,7 +40,7 @@ const urlBuilder = (name) => {
 }
 
 
-function getImages() {
+async function getImages() {
     var url = "https://en.wikipedia.org/w/api.php"; 
 
     var params = {
@@ -53,13 +53,34 @@ function getImages() {
     url = url + "?origin=*";
     Object.keys(params).forEach(function(key){url += "&" + key + "=" + params[key];});
 
-    fetch(url)
+    await fetch(url)
         .then(function(response){return response.json();})
         .then(function(response) {
             var pages = response.query.pages;
             console.log(pages);
+            let f = true;
             for (var page in pages) {
                 for (var img of pages[page].images) {
+                    if (f) {
+                        f = false;
+                        let imgUrl = "https://en.wikipedia.org/w/api.php";
+                        imgUrl += "?origin=*&action=query&format=json&titles=";
+                        imgUrl += img.title;
+                        imgUrl += "&prop=imageinfo&iiprop=url";
+                        console.log(imgUrl);
+                        const res = fetch(imgUrl).then((res) => res.json())
+                        .then(
+                            function(res) {
+                                if (res["query"]["pages"][-1]["missing"]) return;
+                                let resultUrl = res["query"]["pages"][-1]["imageinfo"][0]["url"];
+                                console.log("RESULTURL " + resultUrl);
+                                svg.append("image")
+                                .attr("xlink:href", resultUrl)
+                                .attr("width", 200)
+                                .attr("height", 200);
+                            }
+                        )
+                    }
                     console.log(img.title);
                 }
             }
