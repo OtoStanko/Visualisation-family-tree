@@ -40,13 +40,13 @@ const urlBuilder = (name) => {
 }
 
 
-async function getImages() {
+async function getImageUrl(person) {
     var url = "https://en.wikipedia.org/w/api.php"; 
 
     var params = {
         action: "query",
         prop: "images",
-        titles: "Elizabeth II",
+        titles: person.name,
         format: "json"
     };
 
@@ -74,14 +74,15 @@ async function getImages() {
                                 if (res["query"]["pages"][-1]["missing"]) return;
                                 let resultUrl = res["query"]["pages"][-1]["imageinfo"][0]["url"];
                                 console.log("RESULTURL " + resultUrl);
-                                svg.append("image")
+                                return resultUrl;
+                                g.append("image")
                                 .attr("xlink:href", resultUrl)
                                 .attr("width", 200)
                                 .attr("height", 200);
                             }
                         )
                     }
-                    console.log(img.title);
+                    //console.log(img.title);
                 }
             }
         })
@@ -171,8 +172,8 @@ async function expand(human) {
     }
 }
 
-async function setInfo(human) {
-    const url = urlBuilder(human.name);
+async function setInfo(person) {
+    const url = urlBuilder(person.name);
     const res = await fetch(url).then((res) => res.json())
     if (res["query"]["pages"][0]["missing"]) return;
 
@@ -180,11 +181,14 @@ async function setInfo(human) {
 
     console.log(text);
     var bio = getBio(text);
-    human.bio = bio;
+    person.bio = bio;
+    if (person.url == "") {
+        person.url = getImageUrl(person);
+    }
 
     const [mother, father] = parseData(text);
-    var m_lvl = human.lvl + 1;
-    var m_in_lvl = human.in_lvl * 2;
+    var m_lvl = person.lvl + 1;
+    var m_in_lvl = person.in_lvl * 2;
     people.push({
         name: mother,
         url: "",
@@ -198,8 +202,8 @@ async function setInfo(human) {
         visible: false,
         expanded: false,
     })
-    var f_lvl = human.lvl + 1;
-    var f_in_lvl = human.in_lvl * 2 + 1;
+    var f_lvl = person.lvl + 1;
+    var f_in_lvl = person.in_lvl * 2 + 1;
     people.push({
         name: father,
         url: "",
@@ -213,8 +217,8 @@ async function setInfo(human) {
         visible: false,
         expanded: false,
     })
-    human.mother = people[people.length - 2];
-    human.father = people[people.length - 1];
+    person.mother = people[people.length - 2];
+    person.father = people[people.length - 1];
     svg.selectAll("path"). remove();
     svg.selectAll("line"). remove();
     svg.selectAll("text"). remove();
@@ -404,6 +408,26 @@ function printOnMouseover(text) {
 }
 
 
+function svgBackgroundImage(url, w, pattern_id) {
+  
+    const bg = d3.create("svg"),
+          defs = bg.append("defs");
+    
+    defs.append("pattern")
+      .attr("id", pattern_id ? pattern_id : "pattern")
+      .attr("width", 1)
+      .attr("height", 1)
+      .append('image')
+        .attr("xlink:href", url)
+        .attr("x", -0.05 * w)
+        .attr("y", - 0.05 * w)
+        .attr("width", 1.1 * w)
+        .attr("height", 1.1 * w);
+    
+    return bg.node();
+  }
+
+
 // Creates a shiled in the given svg
 // y - coord of upper bound of the shield
 // x - coord of the center of the shield
@@ -423,9 +447,13 @@ function createShield(svg, x=0, y=0, person) {
     ];
     var stroke_colour = person.male ? "blue" : "red";
 
+    /*{<pattern id="img1" patternUnits="userSpaceOnUse" width="100" height="100">
+        <image href={person.url} x="0" y="0" width="100" height="100" />
+    </pattern>};*/
+
     svg.append('path')
     .attr('d', areaGenerator(points))
-    .attr('fill', 'white')
+    .attr('fill', "white") // selector CSS
     .attr('stroke', stroke_colour)
     .attr('stroke-width', 5)
     .on('click', function () {
