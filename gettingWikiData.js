@@ -16,6 +16,10 @@ var num_people;
 var num_in_top_lvl;
 var num_lvls;
 
+var previous_selected = null;
+var previous_selected_name = "";
+var previous_selected_male = true;
+
 
 // From the name of the person creates url for fetching the data from english wiki
 const urlBuilder = (name) => {
@@ -39,6 +43,12 @@ const urlBuilder = (name) => {
     return endPoint + wikiParams.join("");
 }
 
+
+/*
+====================
+IMAGES
+====================
+ */
 
 async function getImageUrl(person) {
     var url = "https://en.wikipedia.org/w/api.php"; 
@@ -160,15 +170,26 @@ const parseData = (string) => {
 }
 
 
-async function expand(human) {
-    human.expanded = true;
-    if(human.mother.name != null) {
-        human.mother.visible = true;
-        await setInfo(human.mother)
+async function expand(person) {
+    person.expanded = true;
+    if(person.mother.name != null) {
+        person.mother.visible = true;
+        await setInfo(person.mother)
     }
-    if(human.father.name != null) {
-        human.father.visible = true;
-        await setInfo(human.father)
+    if(person.father.name != null) {
+        person.father.visible = true;
+        await setInfo(person.father)
+    }
+    createName(g,
+        getXPos(person,
+        num_lvls, num_in_top_lvl) - (person.name.length * 3),
+        150 * (num_lvls - person.lvl) - 70,
+        person.name,
+        (person.male) ? "blue" : "red");
+    if(previous_selected != null) {
+        previous_selected.setAttribute('style', 'stroke: yellow');
+        console.log("From expand: ");
+        console.log(previous_selected);
     }
 }
 
@@ -320,7 +341,7 @@ function createGraph(people) {
             
             createLines(g, people[i], people[i].mother, people[i].father, x_pos);
             createShield(g, x_pos, 150 * (num_lvls - people[i].lvl), people[i]);
-            createName(g, x_pos - xNameOffset, 150 * (num_lvls - people[i].lvl) - 5, people[i].name)
+            //createName(g, x_pos - xNameOffset, 150 * (num_lvls - people[i].lvl) - 5, people[i].name)
         }
     }
 }
@@ -394,11 +415,12 @@ function createLines(g, person, mother, father, x_pos) {
 }
 
 
-function createName(svg, x=0, y=0, name) {
+function createName(svg, x=0, y=0, name, color) {
     svg.append("text")
     .attr("x", x)
     .attr("y", y)
     .attr("dy", ".2em")
+    .attr("fill", color)
     .text(name);
 }
 
@@ -446,12 +468,17 @@ function createShield(svg, x=0, y=0, person) {
     [x + xOffset, y],
     ];
     var stroke_colour = person.male ? "blue" : "red";
+    var reselect = false;
+    if (previous_selected_name == person.name) {
+        stroke_colour = "yellow";
+        reselect = true;
+    }
 
     /*{<pattern id="img1" patternUnits="userSpaceOnUse" width="100" height="100">
         <image href={person.url} x="0" y="0" width="100" height="100" />
     </pattern>};*/
 
-    svg.append('path')
+    let current = svg.append('path')
     .attr('d', areaGenerator(points))
     .attr('fill', "white") // selector CSS
     .attr('stroke', stroke_colour)
@@ -460,6 +487,19 @@ function createShield(svg, x=0, y=0, person) {
         if(!person.expanded) {
             expand(person);
         }
+
+        if(previous_selected != null) {
+            if (previous_selected_male) {
+                previous_selected.setAttribute('style', 'stroke: blue');
+            } else {
+                previous_selected.setAttribute('style', 'stroke: red');
+            }
+        }
+        previous_selected = this;
+        previous_selected_male = person.male;
+        previous_selected_name = person.name;
+        this.setAttribute('style', 'stroke: yellow');
+
         let xOffset = 22;
         textSvg.selectAll("text").remove();
         textSvg.append("text")
@@ -477,7 +517,18 @@ function createShield(svg, x=0, y=0, person) {
                 .text(parsedBio[i]);
             }
         }
-      });
+        svg.selectAll("text"). remove();
+        createName(g,
+            getXPos(person,
+            num_lvls, num_in_top_lvl) - (person.name.length * 3),
+            150 * (num_lvls - person.lvl) - 70,
+            person.name,
+            (person.male) ? "blue" : "red");
+    });
+    if(reselect) {
+        previous_selected = current["_groups"]["0"][0];
+        reselect = false;
+    }
 }
 
 
