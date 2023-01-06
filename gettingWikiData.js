@@ -100,6 +100,14 @@ async function getImageUrl(person) {
 }
 
 
+
+
+/*
+====================
+Parsing the fetched data
+====================
+ */
+
 // returns string with some basic info about the person
 const getBio = (string) => {
     var regex = / \(.*[0-9]*.* – .*\) /g;
@@ -169,6 +177,15 @@ const parseData = (string) => {
     return [mother, father]
 }
 
+
+
+
+
+/*
+====================
+Interaction with the person
+====================
+ */
 
 async function expand(person) {
     person.expanded = true;
@@ -248,10 +265,19 @@ async function setInfo(person) {
 }
 
 
+
+
+/*
+====================
+UTILS
+====================
+ */
+
 function getBaseLog(x, y) {
     return Math.log(y) / Math.log(x);
 }
 
+// returns the number of visible people in the people array
 function countVisible(people) {
     let visibleCount = 0;
     for (i = 0; i < people.length; i++) {
@@ -263,6 +289,7 @@ function countVisible(people) {
 }
 
 
+// returns true if in the level are at least 3 people right next to each other
 function isTop(people, numlvl) {
     var array = [];
     for (i = 0; i < people.length; i++) {
@@ -287,6 +314,11 @@ function isTop(people, numlvl) {
 }
 
 
+/*
+====================
+TIGHT LAYOUT ALGORITHM
+====================
+ */
 
 function getXPos(person, num_lvls, num_in_top_lvl) {
     var x_pos = 0;
@@ -349,7 +381,7 @@ function createGraph(people) {
 
 // Main function for getting the data about the housetree
 // Starts with Her Majesty Qeeen Elizabeth II
-async function foo(depth=2) {
+async function foo() {
     people.push({
         name: "Elizabeth II",
         url: "",
@@ -415,18 +447,13 @@ function createLines(g, person, mother, father, x_pos) {
 }
 
 
-function createName(svg, x=0, y=0, name, color) {
+function createName(svg, x=0, y=0, name, colour) {
     svg.append("text")
     .attr("x", x)
     .attr("y", y)
     .attr("dy", ".2em")
-    .attr("fill", color)
+    .attr("fill", colour)
     .text(name);
-}
-
-
-function printOnMouseover(text) {
-    console.log(text);
 }
 
 
@@ -447,10 +474,10 @@ function svgBackgroundImage(url, w, pattern_id) {
         .attr("height", 1.1 * w);
     
     return bg.node();
-  }
+}
 
 
-// Creates a shiled in the given svg
+// Creates a shield in the given svg
 // y - coord of upper bound of the shield
 // x - coord of the center of the shield
 function createShield(svg, x=0, y=0, person) {
@@ -468,16 +495,15 @@ function createShield(svg, x=0, y=0, person) {
     [x + xOffset, y],
     ];
     var stroke_colour = person.male ? "blue" : "red";
+    // when redrawing the whole graph, the new shield needs to be reassigned to the previous_selected_...
+    // this is a check that it needs to be done once the shield is created
     var reselect = false;
     if (previous_selected_name == person.name) {
         stroke_colour = "yellow";
         reselect = true;
     }
 
-    /*{<pattern id="img1" patternUnits="userSpaceOnUse" width="100" height="100">
-        <image href={person.url} x="0" y="0" width="100" height="100" />
-    </pattern>};*/
-
+    // shield in the form of the svg path
     let current = svg.append('path')
     .attr('d', areaGenerator(points))
     .attr('fill', "white") // selector CSS
@@ -488,6 +514,7 @@ function createShield(svg, x=0, y=0, person) {
             expand(person);
         }
 
+        // change the colour of the previously selected person back to its original colour
         if(previous_selected != null) {
             if (previous_selected_male) {
                 previous_selected.setAttribute('style', 'stroke: blue');
@@ -495,11 +522,13 @@ function createShield(svg, x=0, y=0, person) {
                 previous_selected.setAttribute('style', 'stroke: red');
             }
         }
+        // set the currently selected person to previous and change the stroke to yellow
         previous_selected = this;
         previous_selected_male = person.male;
         previous_selected_name = person.name;
         this.setAttribute('style', 'stroke: yellow');
 
+        // setup the left panel with the text
         let xOffset = 22;
         textSvg.selectAll("text").remove();
         textSvg.append("text")
@@ -517,6 +546,8 @@ function createShield(svg, x=0, y=0, person) {
                 .text(parsedBio[i]);
             }
         }
+
+        // remove the displayed name and display the name of the selected person
         svg.selectAll("text"). remove();
         createName(g,
             getXPos(person,
