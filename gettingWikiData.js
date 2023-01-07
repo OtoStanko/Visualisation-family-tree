@@ -123,7 +123,7 @@ const getBio = (string) => {
 
     // get death date
     // | death_date   = {{death date and age|2022|09|08|1926|04|21|df=yes}}
-    /*regex = /death_date \s*= .*}}/g;
+    regex = /death_date \s*= .*}}/g;
     result = string.match(regex);
     if(result != null) {
         result = result[0];
@@ -145,7 +145,7 @@ const getBio = (string) => {
            "July", "August", "September", "October", "November", "December" ];
         bioText += "\n" + Number(dates[5]) + " " + months[Number(dates[4]) - 1] + " " + dates[3];
         bioText += " - " + Number(dates[2]) + " " + months[Number(dates[1]) - 1] + " " + dates[0];
-    }*/
+    }
 
     // get full name
     regex = /birth_name\s*= .*\n/g;
@@ -160,21 +160,65 @@ const getBio = (string) => {
 
 
 // From the content of the page extracts names of mother and father
-const parseData = (string) => {
+const getParentsNames = (string) => {
     //console.log(string);
     const regex = /father \s*= \[\[.*\]\]/g;
     var father = string.match(regex);
     if(father != null) {
-        father = father[0].substring(father[0].indexOf("[") + 2, father[0].indexOf("]"))
+        father = father[0].substring(father[0].indexOf("[") + 2, father[0].indexOf("]"));
         //console.log(father)
+    } else {
+        father = null;
     }
     var mother = string.match(/mother \s*= \[\[.*\]\]/g);
     if(mother != null) {
-        mother = mother[0].substring(mother[0].indexOf("[") + 2, mother[0].indexOf("]"))
+        mother = mother[0].substring(mother[0].indexOf("[") + 2, mother[0].indexOf("]"));
         //console.log(mother)
+    } else {
+        mother = null;
     }
     //console.log(father, mother)
     return [mother, father]
+}
+
+const getSpouseName = (string) => {
+    const regex = /spouse \s*= .*\[\[.*\]\]/g;
+    var spouse = string.match(regex);
+    console.log("RES:");
+    console.log(spouse);
+    if(spouse != null) {
+        var spouseName = spouse[0].substring(spouse[0].indexOf("[") + 2, spouse[0].indexOf("]"));
+        //console.log(father)
+    }
+    return spouseName;
+    /*
+    | spouse       = {{Marriage|[[Prince Philip, Duke of Edinburgh]]|20 November 1947|9 April 2021|reason=d}}
+     */
+}
+
+const getChildrenNames = (string) => {
+    //const regex = /issue \s*= {{.*}}/g;
+    var regex = /issue \s*= {{.*?}}/s;
+    var childrenList = string.match(regex);
+    if (childrenList == null) {
+        return [];
+    }
+    regex = /\[\[.*\]\]/g;
+    var childrenNames = childrenList[0].match(regex);
+    var chilrenArray = [];
+    for (var index in childrenNames) {
+        let child = childrenNames[index];
+        chilrenArray.push(child.substring(2, child.length-2));
+    }
+    return chilrenArray;
+    /*
+    | issue        = {{Plainlist|
+* [[Charles III]]
+* [[Anne, Princess Royal]]
+* [[Prince Andrew, Duke of York]]
+* [[Prince Edward, Earl of Wessex]]
+}}
+    */
 }
 
 
@@ -205,8 +249,6 @@ async function expand(person) {
         (person.male) ? "blue" : "red");
     if(previous_selected != null) {
         previous_selected.setAttribute('style', 'stroke: yellow');
-        console.log("From expand: ");
-        console.log(previous_selected);
     }
 }
 
@@ -215,8 +257,10 @@ async function setInfo(person) {
     const res = await fetch(url).then((res) => res.json())
     if (res["query"]["pages"][0]["missing"]) return;
 
+    // fetched result
     var text = res["query"]["pages"][0]["revisions"][0]["content"]
 
+    console.log("===================================================");
     console.log(text);
     var bio = getBio(text);
     person.bio = bio;
@@ -224,39 +268,121 @@ async function setInfo(person) {
         person.url = getImageUrl(person);
     }
 
-    const [mother, father] = parseData(text);
-    var m_lvl = person.lvl + 1;
-    var m_in_lvl = person.in_lvl * 2;
-    people.push({
-        name: mother,
-        url: "",
-        img: "",
-        father: {},
-        mother: {},
-        lvl: m_lvl,
-        in_lvl: m_in_lvl,
-        male: false,
-        bio: "",
-        visible: false,
-        expanded: false,
-    })
-    var f_lvl = person.lvl + 1;
-    var f_in_lvl = person.in_lvl * 2 + 1;
-    people.push({
-        name: father,
-        url: "",
-        img: "",
-        father: {},
-        mother: {},
-        lvl: f_lvl,
-        in_lvl: f_in_lvl,
-        male: true,
-        bio: "",
-        visible: false,
-        expanded: false,
-    })
-    person.mother = people[people.length - 2];
-    person.father = people[people.length - 1];
+    // spouse
+    /*var childrenMother = null;
+    var childrenFather = null;
+    var spouseName = getSpouseName(text);
+    if(!isPersonInArray(people, spouseName)) {
+        let spouse_lvl = person.lvl;
+        var spouse_in_lvl = 0;
+        var is_male = false;
+        if (person.male) {
+            spouse_in_lvl = person.in_lvl;
+            is_male = false;
+            // opravit vsetko napravo
+        } else {
+            spouse_in_lvl = person.in_lvl + 1;
+            is_male = true;
+            // opravit vsetko napravo
+        }
+        people.push({
+            name: spouseName,
+            url: "",
+            img: "",
+            father: [],
+            mother: {},
+            lvl: spouse_lvl,
+            in_lvl: spouse_in_lvl,
+            male: is_male,
+            bio: "",
+            visible: false,
+            expanded: false,
+        });
+        if (person.male) {
+            childrenFather = person;
+            childrenMother = people[people.length - 1];
+        } else {
+            childrenMother = person;
+            childrenFather = people[people.length - 1];
+        }
+    }*/
+
+
+    // down
+    /*let children = getChildrenNames(text);
+    if (person.lvl == 0) {
+        incrementLVLs(people);
+    }
+
+    let children_lvl = person.lvl - 1;
+    let offset = children.length;
+    let leftmostChild_in_lvl = childrenMother.in_lvl / 2;
+
+    repairUp(people, children_lvl, offset, leftmostChild_in_lvl);
+    repairDown(people, children_lvl, offset);
+
+
+    if (children != [] && children.length != 0) {
+        for(i = 0; i < children.length; i++) {
+            let childName = children[i];
+            people.push({
+                name: childName,
+                url: "",
+                img: "",
+                father: childrenFather,
+                mother: childrenMother,
+                lvl: children_lvl,
+                in_lvl: leftmostChild_in_lvl + i,
+                male: false,
+                bio: "",
+                visible: false,
+                expanded: false,
+            });
+        }
+    }*/
+
+
+    // up
+    const [mother, father] = getParentsNames(text);
+    person.mother = null;
+    person.father = null;
+    if (mother != null) {
+        var m_lvl = person.lvl + 1;
+        var m_in_lvl = person.in_lvl * 2;
+        people.push({
+            name: mother,
+            url: "",
+            img: "",
+            father: {},
+            mother: {},
+            lvl: m_lvl,
+            in_lvl: m_in_lvl,
+            male: false,
+            bio: "",
+            visible: false,
+            expanded: false,
+        });
+        person.mother = people[people.length - 1];
+    }
+    if (father != null) {
+        var f_lvl = person.lvl + 1;
+        var f_in_lvl = person.in_lvl * 2 + 1;
+        people.push({
+            name: father,
+            url: "",
+            img: "",
+            father: {},
+            mother: {},
+            lvl: f_lvl,
+            in_lvl: f_in_lvl,
+            male: true,
+            bio: "",
+            visible: false,
+            expanded: false,
+        });
+        person.father = people[people.length - 1];
+    }
+    
     svg.selectAll("path"). remove();
     svg.selectAll("line"). remove();
     svg.selectAll("text"). remove();
@@ -272,6 +398,90 @@ async function setInfo(person) {
 UTILS
 ====================
  */
+
+function repairUp(people, start_lvl, offset, leftmost_in_lvl) {
+    // get max lvl
+    var max_lvl = people[0].lvl;
+    for (i = 0; i < people.length; i++) {
+        if (people[i].lvl > max_lvl) {
+            max_lvl = people[i].lvl;
+        }
+    }
+    // repair the starting lvl
+    for (i = 0; i < people.length; i++) {
+        if (people[i].lvl == start_lvl && people[i].in_lvl >= leftmost_in_lvl) {
+            people.in_lvl += offset;
+        }
+    }
+    // for upper levels:
+    // for female, get the smaller in_lvl of her children
+    // for male, get the largest in_lvl of his children
+    for (curr_lvl = start_lvl + 1; start_lvl <= max_lvl; curr_lvl++) {
+        for (i = 0; i < people.length; i++) {
+            let person = people[i];
+            if (person.lvl == curr_lvl) {
+                if (!person.male) {
+                    person.in_lvl = getSmallestChildInLvl(people, person) * 2;
+                } else {
+                    person.in_lvl = getTheLargestChildInLvl(people, person) * 2 + 1;
+                }
+            }
+        }
+    }
+}
+
+function getTheLargestChildInLvl(people, person) {
+    let largest_in_lvl = null;
+    for (i = 0; i < people.length; i++) {
+        if (people[i].father == person) {
+            if (largest_in_lvl == null) {
+                largest_in_lvl = people[i].in_lvl;
+            }
+            if (people[i].in_lvl > largest_in_lvl) {
+                largest_in_lvl = people[i].in_lvl;
+            }
+        }
+    }
+    return largest_in_lvl;
+}
+
+function getSmallestChildInLvl(people, person) {
+    let smallest_in_lvl = null;
+    for (i = 0; i < people.length; i++) {
+        if (people[i].mother == person) {
+            if (smallest_in_lvl == null) {
+                smallest_in_lvl = people[i].in_lvl;
+            }
+            if (people[i].in_lvl < smallest_in_lvl) {
+                smallest_in_lvl = people[i].in_lvl;
+            }
+        }
+    }
+    return smallest_in_lvl;
+}
+
+function getPerson(people, name) {
+    for (i = 0; i < people.length; i++) {
+        if (people[i].name == name) {
+            return people[i];
+        }
+    }
+}
+
+function isPersonInArray(people, name) {
+    for (i = 0; i < people.length; i++) {
+        if (people[i].name == name) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function incrementLVLs(people) {
+    for(i = 0; i < people.length; i++) {
+        people[i].lvl += 1;
+    }
+}
 
 function getBaseLog(x, y) {
     return Math.log(y) / Math.log(x);
@@ -416,7 +626,7 @@ var visited = []
 
 
 function createPartialLines(g, person, predecessor, x_pos) {
-    if(predecessor.name != null && predecessor.visible) {
+    if(predecessor != null && predecessor.name != null && predecessor.visible) {
         let x1 = getXPos(predecessor, num_lvls, num_in_top_lvl);
         let y1 = 150 * (num_lvls - predecessor.lvl) + 5;
         let x2 = x_pos;
