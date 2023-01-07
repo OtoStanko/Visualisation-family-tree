@@ -112,16 +112,18 @@ Parsing the fetched data
 const getBio = (string) => {
     var regex = / \(.*[0-9]*.* – .*\) /g;
     var bioText = ""
-    result = string.match(regex);
+    /*result = string.match(regex);
     if (result != null) {
         var rawResult = result[0].substring(2, result[0].length-2);
         if (rawResult.includes(";")) {
             rawResult = rawResult.substring(rawResult.indexOf(";") + 1);
         }
+        console.log("BIO start");
+        console.log(rawResult);
         bioText += rawResult;
-    }
+    }*/
 
-    // get death date
+    // get death date, also includes birth date
     // | death_date   = {{death date and age|2022|09|08|1926|04|21|df=yes}}
     regex = /death_date \s*= .*}}/g;
     result = string.match(regex);
@@ -398,6 +400,34 @@ async function setInfo(person) {
 UTILS
 ====================
  */
+
+// returns the new yoffset
+function printText(text, xOffset, yOffset, y) {
+    if (text.length >= 40) {
+        let index = 40;
+        while (text[index] != " ") {
+            index--;
+        }
+        textSvg.append("text")
+        .attr("x", xOffset)
+        .attr("y", y + yOffset)
+        .attr("dy", ".2em")
+        .text(text.substring(0, index));
+        yOffset += 20;
+        textSvg.append("text")
+        .attr("x", xOffset)
+        .attr("y", y + yOffset)
+        .attr("dy", ".2em")
+        .text(text.substring(index));
+    } else {
+        textSvg.append("text")
+        .attr("x", xOffset)
+        .attr("y", y + yOffset)
+        .attr("dy", ".2em")
+        .text(text);
+    }
+    return yOffset;
+}
 
 function repairUp(people, start_lvl, offset, leftmost_in_lvl) {
     // get max lvl
@@ -740,20 +770,14 @@ function createShield(svg, x=0, y=0, person) {
 
         // setup the left panel with the text
         let xOffset = 22;
+        let yOffset = 0;
         textSvg.selectAll("text").remove();
-        textSvg.append("text")
-        .attr("x", xOffset)
-        .attr("y", 10)
-        .attr("dy", ".2em")
-        .text(person.name);
+        yOffset = printText(person.name, xOffset, yOffset, 10);
+        
         if (person.bio != "") {
             let parsedBio = person.bio.split("\n");
             for (i = 0; i < parsedBio.length; i++) {
-                textSvg.append("text")
-                .attr("x", xOffset)
-                .attr("y", 30 + i*20)
-                .attr("dy", ".2em")
-                .text(parsedBio[i]);
+                yOffset = printText(parsedBio[i], xOffset, yOffset, 30 + 20*i)
             }
         }
 
