@@ -11,14 +11,20 @@ var g;
 var textSvg;
 var textG;
 
+var barSvg;
+
 
 var num_people;
 var num_in_top_lvl;
 var num_lvls;
 
-var previous_selected = null;
-var previous_selected_name = "";
-var previous_selected_male = true;
+var prev_selected = null;
+var prev_selected_name = "";
+var prev_selected_male = true;
+
+var prev_bar = null;
+var prev_bar_name = null;
+var prev_bar_male = true;
 
 
 // From the name of the person creates url for fetching the data from english wiki
@@ -249,8 +255,8 @@ async function expand(person) {
         150 * (num_lvls - person.lvl) - 70,
         person.name,
         (person.male) ? "blue" : "red");
-    if(previous_selected != null) {
-        previous_selected.setAttribute('style', 'stroke: yellow');
+    if(prev_selected != null) {
+        prev_selected.setAttribute('style', 'stroke: yellow');
     }
 }
 
@@ -269,6 +275,8 @@ async function setInfo(person) {
     if (person.url == "") {
         person.url = getImageUrl(person);
     }
+
+    person.num_children = getChildrenNames(text).length;
 
     // spouse
     /*var childrenMother = null;
@@ -363,6 +371,9 @@ async function setInfo(person) {
             bio: "",
             visible: false,
             expanded: false,
+            num_children: 0,
+            shield: null,
+            bar: null,
         });
         person.mother = people[people.length - 1];
     }
@@ -381,6 +392,9 @@ async function setInfo(person) {
             bio: "",
             visible: false,
             expanded: false,
+            num_children: 0,
+            shield: null,
+            bar: null,
         });
         person.father = people[people.length - 1];
     }
@@ -389,7 +403,110 @@ async function setInfo(person) {
     svg.selectAll("line"). remove();
     svg.selectAll("text"). remove();
     createGraph(people);
+    createBar(people);
     console.log(people);
+}
+
+
+function createBar(people) {
+    barSvg.selectAll("rect").remove();
+    barSvg.selectAll("text").remove();
+    let visible_people = getVisible(people);
+    let max_children = 0;
+    let barWidth = document.body.offsetWidth / visible_people.length;
+    let thisCanvasHeight = document.documentElement.clientHeight * 0.25;
+    for (i = 0; i < people.length; i++) {
+        if (people[i].num_children > max_children) {
+            max_children = people[i].num_children;
+        }
+    }
+    for (let index = 0; index < visible_people.length; index++) {
+        let person = visible_people[index];
+        console.log(person.name + " " + person.num_children + " " + index);
+
+        //compute bar height with respect to the represented value and availible space
+        var barHeight = (person.num_children / max_children) * (document.documentElement.clientHeight * 0.24);
+    
+        //append a bar to the barchart
+        let reselect = false;
+        let stroke_colour = (person.male) ? "blue" : "red";
+        if (person.name == prev_bar_name) {
+            stroke_colour = "yellow";
+            reselect = true;
+        }
+        let curr_bar = barSvg.append("rect")
+            .attr("x", 0 + index * barWidth)
+            .attr("y", thisCanvasHeight - barHeight)
+            .attr("width", barWidth)
+            .attr("height", barHeight)
+            .attr("fill", "white")
+            .attr("stroke", stroke_colour)
+            .on('click', function () {
+                // change the colour of the previously selected person back to its original colour
+                if (prev_selected != null) {
+                    if (prev_selected_male) {
+                        prev_selected.setAttribute('style', 'stroke: blue');
+                    } else {
+                        prev_selected.setAttribute('style', 'stroke: red');
+                    }
+                }
+                // same with the bar
+                if (prev_bar != null) {
+                    console.log(prev_bar);
+                    if (prev_bar_male) {
+                        prev_bar.setAttribute('style', 'stroke: blue');
+                    } else {
+                        prev_bar.setAttribute('style', 'stroke: red');
+                    }
+                }
+
+                // set the currently selected person to previous and change the stroke to yellow
+                if (prev_selected != null) {
+                    console.log(person.shield);
+                    prev_selected = person.shield;
+                    prev_selected_male = person.male;
+                    prev_selected_name = person.name;
+                    person.shield.setAttribute('style', 'stroke: yellow');
+                }
+                // same with the bar
+                prev_bar = person.bar;
+                prev_bar_male = person.male;
+                prev_bar_name = person.name;
+                prev_bar.setAttribute('style', 'stroke: yellow');
+        
+                // setup the left panel with the text
+                let xOffset = 22;
+                let yOffset = 0;
+                textSvg.selectAll("text").remove();
+                yOffset = printText(person.name, xOffset, yOffset, 10);
+                
+                if (person.bio != "") {
+                    let parsedBio = person.bio.split("\n");
+                    for (i = 0; i < parsedBio.length; i++) {
+                        yOffset = printText(parsedBio[i], xOffset, yOffset, 30 + 20*i)
+                    }
+                }
+        
+                // remove the displayed name and display the name of the selected person
+                svg.selectAll("text"). remove();
+                createName(g,
+                    getXPos(person,
+                    num_lvls, num_in_top_lvl) - (person.name.length * 3),
+                    150 * (num_lvls - person.lvl) - 70,
+                    person.name,
+                    (person.male) ? "blue" : "red");
+            });
+        barSvg.append("text")
+        .attr("x", 0 + (index + 0.5) * barWidth)
+        .attr("y", thisCanvasHeight - barHeight + 20)
+        .text(person.num_children)
+
+
+        person.bar = curr_bar["_groups"]["0"][0];
+        if (reselect) {
+            prev_bar = person.bar;
+        }
+    }
 }
 
 
@@ -400,6 +517,16 @@ async function setInfo(person) {
 UTILS
 ====================
  */
+
+function getVisible(people) {
+    let visible_people = [];
+    for (i = 0; i < people.length; i++) {
+        if (people[i].visible) {
+            visible_people.push(people[i]);
+        }
+    }
+    return visible_people;
+}
 
 // returns the new yoffset
 function printText(text, xOffset, yOffset, y) {
@@ -634,6 +761,9 @@ async function foo() {
         bio: "",
         visible: true,
         expanded: false,
+        num_children: 0,
+        shield: null,
+        bar: null,
     })
     setInfo(people[0]);
     console.log(people)
@@ -652,8 +782,6 @@ var person = {
     expanded: false,
 }
 var people = []
-var visited = []
-
 
 function createPartialLines(g, person, predecessor, x_pos) {
     if(predecessor != null && predecessor.name != null && predecessor.visible) {
@@ -738,7 +866,7 @@ function createShield(svg, x=0, y=0, person) {
     // when redrawing the whole graph, the new shield needs to be reassigned to the previous_selected_...
     // this is a check that it needs to be done once the shield is created
     var reselect = false;
-    if (previous_selected_name == person.name) {
+    if (prev_selected_name == person.name) {
         stroke_colour = "yellow";
         reselect = true;
     }
@@ -755,18 +883,36 @@ function createShield(svg, x=0, y=0, person) {
         }
 
         // change the colour of the previously selected person back to its original colour
-        if(previous_selected != null) {
-            if (previous_selected_male) {
-                previous_selected.setAttribute('style', 'stroke: blue');
+        if (prev_selected != null) {
+            if (prev_selected_male) {
+                prev_selected.setAttribute('style', 'stroke: blue');
             } else {
-                previous_selected.setAttribute('style', 'stroke: red');
+                prev_selected.setAttribute('style', 'stroke: red');
             }
         }
+        // same with the bar
+        if (prev_bar != null) {
+            console.log(prev_bar);
+            if (prev_bar_male) {
+                prev_bar.setAttribute('style', 'stroke: blue');
+            } else {
+                prev_bar.setAttribute('style', 'stroke: red');
+            }
+        }
+
+
+
+
         // set the currently selected person to previous and change the stroke to yellow
-        previous_selected = this;
-        previous_selected_male = person.male;
-        previous_selected_name = person.name;
+        prev_selected = this;
+        prev_selected_male = person.male;
+        prev_selected_name = person.name;
         this.setAttribute('style', 'stroke: yellow');
+        // same with the bar
+        prev_bar = person.bar;
+        prev_bar_male = person.male;
+        prev_bar_name = person.name;
+        prev_bar.setAttribute('style', 'stroke: yellow');
 
         // setup the left panel with the text
         let xOffset = 22;
@@ -790,14 +936,15 @@ function createShield(svg, x=0, y=0, person) {
             person.name,
             (person.male) ? "blue" : "red");
     });
+    person.shield = current["_groups"]["0"][0];
     if(reselect) {
-        previous_selected = current["_groups"]["0"][0];
+        prev_selected = current["_groups"]["0"][0];
         reselect = false;
     }
 }
 
 
-function init(svg_fromHTML, text_svg) {
+function init(svg_fromHTML, text_svg, bar_svg) {
     console.log("Init run")
     // create svg element:
     svg = svg_fromHTML;
@@ -817,6 +964,8 @@ function init(svg_fromHTML, text_svg) {
     .attr('fill', 'red')
     .attr('stroke', stroke_colour)
     .attr('stroke-width', 3)
+
+    barSvg = bar_svg;
 
     foo();
 }
