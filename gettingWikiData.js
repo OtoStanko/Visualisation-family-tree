@@ -1,18 +1,14 @@
 
 
 //D3.js canvases
-var textArea;
-var mapArea;
-var mapAreaWidth = 1520;
-
 var svg;
 var g;
+var zoom;
 
 var textSvg;
 var textG;
 
 var barSvg;
-
 
 var num_people;
 var num_in_top_lvl;
@@ -45,7 +41,6 @@ const urlBuilder = (name) => {
         '&redirects',
         '&origin=*'
     ];
-
     return endPoint + wikiParams.join("");
 }
 
@@ -55,6 +50,44 @@ const urlBuilder = (name) => {
 IMAGES
 ====================
  */
+
+async function parseImage(text) {
+    let regex = /image \s*=.*\n/g;
+    let result = text.match(regex)[0];
+    result = result.substring(result.indexOf('=')+1).trim()
+    result = result.replaceAll('\n', '');
+    
+    const comment = result.indexOf("<");
+    if (comment != -1) {
+        result = result.substring(0, comment);
+    }
+    result = result.replaceAll(' ', '_');
+
+    let imgUrl = "https://en.wikipedia.org/w/api.php";
+    imgUrl += "?origin=*&action=query&format=json&titles=";
+    if (!result.startsWith("File:")) {
+        imgUrl += "File:"
+    }
+    imgUrl += result;
+    imgUrl += "&prop=imageinfo&iiprop=url";
+
+    const data = await fetch(imgUrl).then(res => res.json()).catch(err => console.error(err));
+    console.log(data);
+
+    try{
+        const d = data["query"]["pages"][-1]["imageinfo"][0]["url"];
+        return d;
+    }catch(Ex){
+        const pages = data["query"]["pages"];
+        for (let page in pages) {
+            console.log(page);
+            return pages[page]["imageinfo"][0]["url"];
+        }
+    }
+
+
+    // https://en.wikipedia.org/w/api.php?origin=*&action=query&format=json&titles=Queen_Elizabeth_II_official_portrait_for_1959_tour_(retouched)_(cropped)_(3-to-4_aspect_ratio).jpg&prop=imageinfo&iiprop=url 
+} 
 
 async function getImageUrl(person) {
     var url = "https://en.wikipedia.org/w/api.php"; 
@@ -74,30 +107,22 @@ async function getImageUrl(person) {
         .then(function(response) {
             var pages = response.query.pages;
             console.log(pages);
-            let f = true;
             for (var page in pages) {
                 for (var img of pages[page].images) {
-                    if (f) {
-                        f = false;
-                        let imgUrl = "https://en.wikipedia.org/w/api.php";
-                        imgUrl += "?origin=*&action=query&format=json&titles=";
-                        imgUrl += img.title;
-                        imgUrl += "&prop=imageinfo&iiprop=url";
-                        console.log(imgUrl);
-                        const res = fetch(imgUrl).then((res) => res.json())
-                        .then(
-                            function(res) {
-                                if (res["query"]["pages"][-1]["missing"]) return;
-                                let resultUrl = res["query"]["pages"][-1]["imageinfo"][0]["url"];
-                                console.log("RESULTURL " + resultUrl);
-                                return resultUrl;
-                                g.append("image")
-                                .attr("xlink:href", resultUrl)
-                                .attr("width", 200)
-                                .attr("height", 200);
-                            }
-                        )
-                    }
+                    let imgUrl = "https://en.wikipedia.org/w/api.php";
+                    imgUrl += "?origin=*&action=query&format=json&titles=";
+                    imgUrl += img.title;
+                    imgUrl += "&prop=imageinfo&iiprop=url";
+                    console.log(imgUrl);
+                    fetch(imgUrl).then((res) => res.json())
+                    .then(
+                        function(res) {
+                            if (res["query"]["pages"][-1]["missing"]) return;
+                            let resultUrl = res["query"]["pages"][-1]["imageinfo"][0]["url"];
+                            console.log("RESULT URL " + resultUrl);
+                            return resultUrl;
+                        }
+                    )
                     //console.log(img.title);
                 }
             }
@@ -135,7 +160,7 @@ const getBio = (string) => {
     result = string.match(regex);
     if(result != null) {
         result = result[0];
-        console.log("DEATH1: " + result);
+        //console.log("DEATH1: " + result);
         result = result.substring(result.indexOf("{") + 2, result.indexOf("}"));
         result = result.split("|");
         let dates = [];
@@ -145,7 +170,7 @@ const getBio = (string) => {
             }
             dates.push(result[i]);
         }
-        console.log("DEATH2: " + dates);
+        //console.log("DEATH2: " + dates);
         if (dates.length != 6) {
             return;
         }
@@ -162,7 +187,7 @@ const getBio = (string) => {
         var rawResult = "\n" + result[0].substring(result[0].indexOf("=") + 2, result[0].length);
         bioText += rawResult;
     }
-    console.log("bio: " + bioText);
+    //console.log("bio: " + bioText);
     return bioText;
 }
 
@@ -192,8 +217,8 @@ const getParentsNames = (string) => {
 const getSpouseName = (string) => {
     const regex = /spouse \s*= .*\[\[.*\]\]/g;
     var spouse = string.match(regex);
-    console.log("RES:");
-    console.log(spouse);
+    //console.log("RES:");
+    //console.log(spouse);
     if(spouse != null) {
         var spouseName = spouse[0].substring(spouse[0].indexOf("[") + 2, spouse[0].indexOf("]"));
         //console.log(father)
@@ -211,6 +236,8 @@ const getChildrenNames = (string) => {
     if (childrenList == null) {
         return [];
     }
+    //console.log("CHILDREN:");
+    //console.log(childrenList);
     regex = /\[\[.*\]\]/g;
     var childrenNames = childrenList[0].match(regex);
     var chilrenArray = [];
@@ -241,11 +268,11 @@ Interaction with the person
 
 async function expand(person) {
     person.expanded = true;
-    if(person.mother.name != null) {
+    if(person.mother != null) {
         person.mother.visible = true;
         await setInfo(person.mother)
     }
-    if(person.father.name != null) {
+    if(person.father != null) {
         person.father.visible = true;
         await setInfo(person.father)
     }
@@ -268,12 +295,15 @@ async function setInfo(person) {
     // fetched result
     var text = res["query"]["pages"][0]["revisions"][0]["content"]
 
-    console.log("===================================================");
+    //console.log("===================================================");
     console.log(text);
     var bio = getBio(text);
     person.bio = bio;
     if (person.url == "") {
-        person.url = getImageUrl(person);
+        person.url = await parseImage(text);
+        if (person.url == null) {
+            console.log(person);
+        }
     }
 
     person.num_children = getChildrenNames(text).length;
@@ -402,9 +432,10 @@ async function setInfo(person) {
     svg.selectAll("path"). remove();
     svg.selectAll("line"). remove();
     svg.selectAll("text"). remove();
+    svg.selectAll("defs"). remove();
     createGraph(people);
     createBar(people);
-    console.log(people);
+    //console.log(people);
 }
 
 
@@ -422,7 +453,7 @@ function createBar(people) {
     }
     for (let index = 0; index < visible_people.length; index++) {
         let person = visible_people[index];
-        console.log(person.name + " " + person.num_children + " " + index);
+        //console.log(person.name + " " + person.num_children + " " + index);
 
         //compute bar height with respect to the represented value and availible space
         var barHeight = (person.num_children / max_children) * (document.documentElement.clientHeight * 0.24);
@@ -452,7 +483,7 @@ function createBar(people) {
                 }
                 // same with the bar
                 if (prev_bar != null) {
-                    console.log(prev_bar);
+                    //console.log(prev_bar);
                     if (prev_bar_male) {
                         prev_bar.setAttribute('style', 'stroke: blue');
                     } else {
@@ -462,7 +493,7 @@ function createBar(people) {
 
                 // set the currently selected person to previous and change the stroke to yellow
                 if (prev_selected != null) {
-                    console.log(person.shield);
+                    //console.log(person.shield);
                     prev_selected = person.shield;
                     prev_selected_male = person.male;
                     prev_selected_name = person.name;
@@ -724,7 +755,7 @@ function createGraph(people) {
     num_lvls = 1;
     for (level = maxPeopleLvl; level >= 1; level--) {
         if (isTop(people, level)) {
-            console.log("Top level:" + level);
+            // console.log("Top level:" + level);
             num_in_top_lvl = Math.pow(2, level);
             num_lvls = level;
             break;
@@ -735,7 +766,6 @@ function createGraph(people) {
     for (i = 0; i < num_people; i++) {
         if (people[i].name != null && people[i].visible) {
             //console.log("name: " + people[i].name);
-            var xNameOffset = people[i].name.length * 3;
             var x_pos = getXPos(people[i], num_lvls, num_in_top_lvl);
             
             createLines(g, people[i], people[i].mother, people[i].father, x_pos);
@@ -766,7 +796,7 @@ async function foo() {
         bar: null,
     })
     setInfo(people[0]);
-    console.log(people)
+    //console.log(people)
 }
 
 
@@ -871,10 +901,42 @@ function createShield(svg, x=0, y=0, person) {
         reselect = true;
     }
 
+    const hash = (person) => {
+        const str = person.name.replaceAll(' ', '_');
+        let h = 0;
+        let rand = Math.floor(Math.random() * Math.random()*100000000); 
+        if (str.length == 0) return h;
+        for (let char in str) {
+            h = ((h << rand)-h)+ char;
+            h = h & h;
+        }
+        return h;
+    }
+    const hashedName = hash(person);
+
+
+
     // shield in the form of the svg path
-    let current = svg.append('path')
+    svg
+    .append("defs").append("pattern")
+    .attr('id', `img-${hashedName}`)
+    .attr('height', '120')
+    .attr('width', '100')
+    .attr( 'x', x-50) 
+    .attr('y', y-50)
+    .attr('patternUnits', 'userSpaceOnUse')
+    
+    .append('image')
+    .attr('href', `${person.url}`)
+    .attr( 'x', "0") 
+    .attr('y', "0")
+    .attr('width', "100")
+    .attr('height', "120")
+
+    let current = svg
+    .append('path')
     .attr('d', areaGenerator(points))
-    .attr('fill', "white") // selector CSS
+    .attr('fill', `url(#img-${hashedName})`)
     .attr('stroke', stroke_colour)
     .attr('stroke-width', 5)
     .on('click', function () {
@@ -892,16 +954,13 @@ function createShield(svg, x=0, y=0, person) {
         }
         // same with the bar
         if (prev_bar != null) {
-            console.log(prev_bar);
+            //console.log(prev_bar);
             if (prev_bar_male) {
                 prev_bar.setAttribute('style', 'stroke: blue');
             } else {
                 prev_bar.setAttribute('style', 'stroke: red');
             }
         }
-
-
-
 
         // set the currently selected person to previous and change the stroke to yellow
         prev_selected = this;
@@ -935,7 +994,28 @@ function createShield(svg, x=0, y=0, person) {
             150 * (num_lvls - person.lvl) - 70,
             person.name,
             (person.male) ? "blue" : "red");
+        
+
+        // Some calculations
+        
+        /*let selected_y = getXPos(person, num_lvls, num_in_top_lvl);
+        let selected_x = 150 * (num_lvls - person.lvl);
+        console.log(selected_x, selected_y);
+        
+        let xOffset_translation = document.body.clientWidth/2;
+        let yOffset_translation = document.body.clientHeight/2
+        
+        let tr = `translate(${-selected_x + xOffset_translation},${-selected_y + yOffset_translation})`;
+        console.log(zoom);
+        zoom.translateTo(svg, xOffset_translation, yOffset_translation);*/
+        //g.transition().call(zoom.transform, d3.zoomIdentity);
+        //svg.transition().call(zoom.transform, d3.zoomIdentity.translate(xOffset_translation, yOffset_translation))
+        //.scale(1).translate(-selected_x, -selected_y);
+        //zoom.zoomTransform(svg).invert([xOffset_translation, yOffset_translation]);
+        //g.attr("transform", tr);
     });
+
+
     person.shield = current["_groups"]["0"][0];
     if(reselect) {
         prev_selected = current["_groups"]["0"][0];
@@ -944,14 +1024,18 @@ function createShield(svg, x=0, y=0, person) {
 }
 
 
-function init(svg_fromHTML, text_svg, bar_svg) {
-    console.log("Init run")
+function init(svg_fromHTML, text_svg, bar_svg, html_zoom) {
+    //console.log("Init run")
     // create svg element:
     svg = svg_fromHTML;
 
+    zoom = html_zoom;
+
+    console.log(zoom);
+
     textSvg = text_svg;
     var areaGenerator = d3.area();
-    console.log(document.body.offsetWidth, document.documentElement.clientHeight);
+    //console.log(document.body.offsetWidth, document.documentElement.clientHeight);
     var points = [
         [1, 0],
         [1, document.documentElement.clientHeight],
@@ -959,11 +1043,7 @@ function init(svg_fromHTML, text_svg, bar_svg) {
         [15, 0],
         ];
     let stroke_colour = "yellow";
-    textSvg.append('path')
-    .attr('d', areaGenerator(points))
-    .attr('fill', 'red')
-    .attr('stroke', stroke_colour)
-    .attr('stroke-width', 3)
+    
 
     barSvg = bar_svg;
 

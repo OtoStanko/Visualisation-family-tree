@@ -2,51 +2,49 @@ body{
 	background:#64665d;
 	/*margin-top:50px;*/
 	font: 15px "Trebuchet MS";
-	color:#de4d4d;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
 
+.container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: space-around;
+  align-content: center;
+  align-items: center;
+}
+
+.container > * {
+  width: 100%;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  align-self: auto;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  flex: 0 1 auto;
+  align-self: auto;
+  justify-content: space-between;
+}
+
+.sidebar {
+  width: 25%;
 }
 
 
-#map_div{
-    width:75%;
-    height:50vh;
-    /*border:1px solid red;*/
-    /*margin-right:10px;*/
-    float:left;
+
+.main {
+  background-color: aquamarine;
 }
-
-#text_div{
-    width:100%;
-    height:30vh;
-    background-color: azure;
-    /*border:1px solid red;*/
-    font-size: calc(2vw + 2vh);
-    float:left;
-}
-
-
-.headline, .subline{
-  display: block;
-  margin-top: 0.67em;
-  margin-bottom: 0.67em;
-  margin-left: 0;
-  margin-right: 0;
-  fill: white;
-  font-family: 'PT Sans',sans-serif;
-  opacity: 0.5;
-}
-
-.headline{
-  font-weight: bold;
-}
-
-.subline{
-  font-size: 50%;
-  font-weight: thin;
-}
-
-.label{
-  font-family: 'PT Sans',sans-serif;
-  opacity: 1;
-  font-size: 30%;
+.sidebar {
+  background-color: cyan;
 }
