@@ -1,14 +1,33 @@
 
 
 //D3.js canvases
-var svg;
-var g;
-var zoom;
+var svg = d3
+    .select(".main")
+    .append("svg")
+    .attr("width", document.documentElement.clientWidth * 0.75)
+    .attr("height", document.documentElement.clientHeight * 0.60);
+var g = svg.append("g");
+var zoom = d3.zoom()
+zoom.on('zoom', event => {
+    g.attr("transform", event.transform)
+})
 
-var textSvg;
-var textG;
 
-var barSvg;
+
+var textSvg = d3
+    .select(".sidebar")
+    .append("svg")
+    .attr("width", document.body.offsetWidth * 0.25)
+    .attr("dx", document.body.offsetWidth * 0.75)
+    .attr("height", document.documentElement.clientHeight * 0.60);
+var textG = textSvg.append("g");
+
+var barSvg = d3
+    .select(".barplot")
+    .append("svg")
+    .attr("width", document.body.offsetWidth)
+    .attr("dy", document.body.offsetHeight * 0.75)
+    .attr("height", document.documentElement.clientHeight * 0.25);
 
 var num_people;
 var num_in_top_lvl;
@@ -25,6 +44,7 @@ var prev_bar_male = true;
 
 // From the name of the person creates url for fetching the data from english wiki
 const urlBuilder = (name) => {
+    console.log(name);
     const fixedName = name.replaceAll(" ", "_")
     //console.log(fixedName)
     const endPoint = "https://en.wikipedia.org/w/api.php";
@@ -52,37 +72,45 @@ IMAGES
  */
 
 async function parseImage(text) {
-    let regex = /image \s*=.*\n/g;
-    let result = text.match(regex)[0];
-    result = result.substring(result.indexOf('=')+1).trim()
-    result = result.replaceAll('\n', '');
-    
-    const comment = result.indexOf("<");
-    if (comment != -1) {
-        result = result.substring(0, comment);
-    }
-    result = result.replaceAll(' ', '_');
-
-    let imgUrl = "https://en.wikipedia.org/w/api.php";
-    imgUrl += "?origin=*&action=query&format=json&titles=";
-    if (!result.startsWith("File:")) {
-        imgUrl += "File:"
-    }
-    imgUrl += result;
-    imgUrl += "&prop=imageinfo&iiprop=url";
-
-    const data = await fetch(imgUrl).then(res => res.json()).catch(err => console.error(err));
-    console.log(data);
-
-    try{
-        const d = data["query"]["pages"][-1]["imageinfo"][0]["url"];
-        return d;
-    }catch(Ex){
-        const pages = data["query"]["pages"];
-        for (let page in pages) {
-            console.log(page);
-            return pages[page]["imageinfo"][0]["url"];
+    try {
+        let regex = /image \s*=.*\n/g;
+        let result = text.match(regex);
+        if (result == null) {
+            return "";
         }
+        result = result[0];
+        result = result.substring(result.indexOf('=')+1).trim()
+        result = result.replaceAll('\n', '');
+        
+        const comment = result.indexOf("<");
+        if (comment != -1) {
+            result = result.substring(0, comment);
+        }
+        result = result.replaceAll(' ', '_');
+
+        let imgUrl = "https://en.wikipedia.org/w/api.php";
+        imgUrl += "?origin=*&action=query&format=json&titles=";
+        if (!result.startsWith("File:")) {
+            imgUrl += "File:"
+        }
+        imgUrl += result;
+        imgUrl += "&prop=imageinfo&iiprop=url";
+
+        const data = await fetch(imgUrl).then(res => res.json()).catch(err => console.error(err));
+        console.log(data);
+
+        try {
+            const d = data["query"]["pages"][-1]["imageinfo"][0]["url"];
+            return d;
+        } catch(Ex) {
+            const pages = data["query"]["pages"];
+            for (let page in pages) {
+                console.log(page);
+                return pages[page]["imageinfo"][0]["url"];
+            }
+        }
+    } catch(Ex) {
+        return "";
     }
 
 
@@ -195,7 +223,7 @@ const getBio = (string) => {
 // From the content of the page extracts names of mother and father
 const getParentsNames = (string) => {
     //console.log(string);
-    const regex = /father \s*= \[\[.*\]\]/g;
+    regex = /father \s*= \[\[.*\]\]/g;
     var father = string.match(regex);
     if(father != null) {
         father = father[0].substring(father[0].indexOf("[") + 2, father[0].indexOf("]"));
@@ -229,31 +257,58 @@ const getSpouseName = (string) => {
      */
 }
 
-const getChildrenNames = (string) => {
-    //const regex = /issue \s*= {{.*}}/g;
-    var regex = /issue \s*= {{.*?}}/s;
-    var childrenList = string.match(regex);
-    if (childrenList == null) {
-        return [];
-    }
-    //console.log("CHILDREN:");
-    //console.log(childrenList);
-    regex = /\[\[.*\]\]/g;
-    var childrenNames = childrenList[0].match(regex);
+
+function extractNames(text) {
+    regex = /\[\[.*?\]\]/g;
+    var childrenNames = text.match(regex);
+    console.log(childrenNames);
     var chilrenArray = [];
     for (var index in childrenNames) {
         let child = childrenNames[index];
         chilrenArray.push(child.substring(2, child.length-2));
     }
     return chilrenArray;
-    /*
-    | issue        = {{Plainlist|
-* [[Charles III]]
-* [[Anne, Princess Royal]]
-* [[Prince Andrew, Duke of York]]
-* [[Prince Edward, Earl of Wessex]]
-}}
-    */
+}
+
+const getChildrenNames = (string) => {
+    // issue
+    //const regex = /issue \s*= {{.*}}/g;
+    var regex = /issue \s*= {{.*?}}/s;
+    var childrenList = string.match(regex);
+    if (childrenList != null) {
+        console.log("FIRST MATCH");
+        console.log(childrenList[0]);
+        if (!childrenList[0].includes("{{Plainlist}}")) {
+            return extractNames(childrenList[0]);
+        } else {
+            console.log("LONG PLAINLIST");
+            console.log(childrenList[0]);
+            regex = /issue \s*= {{Plainlist}}.*?{{Endplainlist}}/s;
+            childrenList = string.match(regex);
+            return extractNames(childrenList[0]);
+        }
+        
+    }
+
+    regex = /children \s*= {{.*?}}/s;
+    childrenList = string.match(regex);
+    if (childrenList != null) {
+        childrenList = childrenList[0];
+        regex = /\n/g;
+        childrenList = childrenList.match(regex);
+        if (childrenList == null) {
+            return [];
+        }
+        return childrenList;
+    }
+    return [];
+    //console.log("CHILDREN:");
+    //console.log(childrenList);
+    
+    
+
+
+    // children
 }
 
 
@@ -269,13 +324,27 @@ Interaction with the person
 async function expand(person) {
     person.expanded = true;
     if(person.mother != null) {
-        person.mother.visible = true;
+        console.log("MOTHER")
+        console.log(person);
+        console.log(person.mother);
         await setInfo(person.mother)
+        person.mother.visible = true;
+        
     }
     if(person.father != null) {
-        person.father.visible = true;
+        console.log("FATHER")
+        console.log(person);
+        console.log(person.father);
         await setInfo(person.father)
+        person.father.visible = true;
     }
+    svg.selectAll("path"). remove();
+    svg.selectAll("line"). remove();
+    svg.selectAll("text"). remove();
+    svg.selectAll("defs"). remove();
+    createGraph(people);
+    createBar(people);
+
     createName(g,
         getXPos(person,
         num_lvls, num_in_top_lvl) - (person.name.length * 3),
@@ -288,6 +357,8 @@ async function expand(person) {
 }
 
 async function setInfo(person) {
+    console.log("PRE-URL");
+    console.log(person);
     const url = urlBuilder(person.name);
     const res = await fetch(url).then((res) => res.json())
     if (res["query"]["pages"][0]["missing"]) return;
@@ -307,6 +378,22 @@ async function setInfo(person) {
     }
 
     person.num_children = getChildrenNames(text).length;
+    if (person.num_children == 0) {
+        let regex = /children \s*=.*/g;
+        let result = text.match(regex);
+        console.log(result);
+        if (result == null) {
+            // still cannot get the number of children
+            person.num_children = 1;
+        } else {
+            result = result[0];
+            console.log(result.substring(result.indexOf("=") + 1));
+            person.num_children = Number(result.substring(result.indexOf("=") + 1));
+        }
+        if (person.num_children == 0) {
+            person.num_children = 1;
+        }
+    }
 
     // spouse
     /*var childrenMother = null;
@@ -383,18 +470,27 @@ async function setInfo(person) {
 
 
     // up
+    console.log("UP FOR: " + person.name);
     const [mother, father] = getParentsNames(text);
+
+    console.log("HERE");
+    console.log(person);
+    console.log(mother);
+    console.log(father);
+
+
     person.mother = null;
     person.father = null;
     if (mother != null) {
         var m_lvl = person.lvl + 1;
         var m_in_lvl = person.in_lvl * 2;
+        let side = (person.side != "white") ? person.side : "lightcoral";
         people.push({
             name: mother,
             url: "",
             img: "",
-            father: {},
-            mother: {},
+            father: null,
+            mother: null,
             lvl: m_lvl,
             in_lvl: m_in_lvl,
             male: false,
@@ -404,18 +500,20 @@ async function setInfo(person) {
             num_children: 0,
             shield: null,
             bar: null,
+            side: side,
         });
         person.mother = people[people.length - 1];
     }
     if (father != null) {
         var f_lvl = person.lvl + 1;
         var f_in_lvl = person.in_lvl * 2 + 1;
+        let side = (person.side != "white") ? person.side : "lightblue";
         people.push({
             name: father,
             url: "",
             img: "",
-            father: {},
-            mother: {},
+            father: null,
+            mother: null,
             lvl: f_lvl,
             in_lvl: f_in_lvl,
             male: true,
@@ -425,16 +523,17 @@ async function setInfo(person) {
             num_children: 0,
             shield: null,
             bar: null,
+            side: side,
         });
         person.father = people[people.length - 1];
     }
     
-    svg.selectAll("path"). remove();
+    /*svg.selectAll("path"). remove();
     svg.selectAll("line"). remove();
     svg.selectAll("text"). remove();
     svg.selectAll("defs"). remove();
     createGraph(people);
-    createBar(people);
+    createBar(people);*/
     //console.log(people);
 }
 
@@ -451,12 +550,13 @@ function createBar(people) {
             max_children = people[i].num_children;
         }
     }
+    max_children++;
     for (let index = 0; index < visible_people.length; index++) {
         let person = visible_people[index];
         //console.log(person.name + " " + person.num_children + " " + index);
 
         //compute bar height with respect to the represented value and availible space
-        var barHeight = (person.num_children / max_children) * (document.documentElement.clientHeight * 0.24);
+        var barHeight = ((person.num_children + 1) / max_children) * (document.documentElement.clientHeight * 0.24);
     
         //append a bar to the barchart
         let reselect = false;
@@ -470,8 +570,9 @@ function createBar(people) {
             .attr("y", thisCanvasHeight - barHeight)
             .attr("width", barWidth)
             .attr("height", barHeight)
-            .attr("fill", "white")
+            .attr("fill", person.side)
             .attr("stroke", stroke_colour)
+            .attr("stroke-width", 2)
             .on('click', function () {
                 // change the colour of the previously selected person back to its original colour
                 if (prev_selected != null) {
@@ -794,8 +895,16 @@ async function foo() {
         num_children: 0,
         shield: null,
         bar: null,
+        side: "white",
     })
-    setInfo(people[0]);
+    await setInfo(people[0]);
+
+    svg.selectAll("path"). remove();
+    svg.selectAll("line"). remove();
+    svg.selectAll("text"). remove();
+    svg.selectAll("defs"). remove();
+    createGraph(people);
+    createBar(people);
     //console.log(people)
 }
 
@@ -914,9 +1023,7 @@ function createShield(svg, x=0, y=0, person) {
     }
     const hashedName = hash(person);
 
-
-
-    // shield in the form of the svg path
+    // create background image
     svg
     .append("defs").append("pattern")
     .attr('id', `img-${hashedName}`)
@@ -933,10 +1040,17 @@ function createShield(svg, x=0, y=0, person) {
     .attr('width', "100")
     .attr('height', "120")
 
+    let filling = `url(#img-${hashedName})`;
+
+    if (person.url == "") {
+        filling = "white";
+    }
+
+    // shield in the form of the svg path
     let current = svg
     .append('path')
     .attr('d', areaGenerator(points))
-    .attr('fill', `url(#img-${hashedName})`)
+    .attr('fill', filling)
     .attr('stroke', stroke_colour)
     .attr('stroke-width', 5)
     .on('click', function () {
@@ -996,14 +1110,27 @@ function createShield(svg, x=0, y=0, person) {
             (person.male) ? "blue" : "red");
         
 
-        // Some calculations
+            /*
+            // Some calculations
+            let xOffset_translation = document.body.clientWidth/2;
+            let yOffset_translation = document.body.clientHeight/2
+
+
+            console.log(d3.zoomTransform(svg.node()));
+            console.log(d3.zoomTransform(g.node()));
+
+        var t = d3.zoomIdentity.translate(xOffset_translation, yOffset_translation).scale(4);
+        svg.transition()
+        .duration(750)
+        .call(
+            zoom.transform, 
+            d3.zoomIdentity.translate(xOffset_translation, yOffset_translation).scale(4)
+        );
         
-        /*let selected_y = getXPos(person, num_lvls, num_in_top_lvl);
+        let selected_y = getXPos(person, num_lvls, num_in_top_lvl);
         let selected_x = 150 * (num_lvls - person.lvl);
         console.log(selected_x, selected_y);
         
-        let xOffset_translation = document.body.clientWidth/2;
-        let yOffset_translation = document.body.clientHeight/2
         
         let tr = `translate(${-selected_x + xOffset_translation},${-selected_y + yOffset_translation})`;
         console.log(zoom);
@@ -1024,16 +1151,10 @@ function createShield(svg, x=0, y=0, person) {
 }
 
 
-function init(svg_fromHTML, text_svg, bar_svg, html_zoom) {
+function init() {
     //console.log("Init run")
     // create svg element:
-    svg = svg_fromHTML;
-
-    zoom = html_zoom;
-
     console.log(zoom);
-
-    textSvg = text_svg;
     var areaGenerator = d3.area();
     //console.log(document.body.offsetWidth, document.documentElement.clientHeight);
     var points = [
@@ -1043,9 +1164,10 @@ function init(svg_fromHTML, text_svg, bar_svg, html_zoom) {
         [15, 0],
         ];
     let stroke_colour = "yellow";
-    
-
-    barSvg = bar_svg;
 
     foo();
 }
+
+
+svg.call(zoom)
+init();
